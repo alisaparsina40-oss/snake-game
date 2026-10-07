@@ -1277,18 +1277,20 @@ function hideResultOverlay() {
 
 function mpStartRound() {
     const midY = Math.floor(tileCount / 2);
-    const sx = Math.max(4, Math.floor(tileCount * 0.3));
-    const ox = Math.min(tileCount - 5, Math.floor(tileCount * 0.7));
+    const col = Math.max(3, Math.floor(tileCount * 0.35));
+    const gap = Math.max(2, Math.floor(tileCount * 0.2));
+    const row1 = Math.max(1, midY - gap);
+    const row2 = Math.min(tileCount - 2, midY + gap);
 
     mpSelf = [
-        { x: sx, y: midY },
-        { x: sx - 1, y: midY },
-        { x: sx - 2, y: midY }
+        { x: col, y: row1 },
+        { x: col - 1, y: row1 },
+        { x: col - 2, y: row1 }
     ];
     mpOther = [
-        { x: ox, y: midY },
-        { x: ox + 1, y: midY },
-        { x: ox + 2, y: midY }
+        { x: col, y: row2 },
+        { x: col - 1, y: row2 },
+        { x: col - 2, y: row2 }
     ];
 
     velocityX = 1;
@@ -1296,8 +1298,8 @@ function mpStartRound() {
     nextVelocityX = 1;
     nextVelocityY = 0;
     mpSelfVel = { x: 1, y: 0 };
-    mpOtherVel = { x: -1, y: 0 };
-    mpOtherNext = { x: -1, y: 0 };
+    mpOtherVel = { x: 1, y: 0 };
+    mpOtherNext = { x: 1, y: 0 };
     mpScores = [0, 0];
     mpOver = false;
     mpWinner = 0;
