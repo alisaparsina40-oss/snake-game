@@ -38,6 +38,7 @@ const createRoomBtn = document.getElementById('createRoomBtn');
 const joinRoomBtn = document.getElementById('joinRoomBtn');
 const leaveRoomBtn = document.getElementById('leaveRoomBtn');
 const roomStatusEl = document.getElementById('roomStatus');
+const quickNameEl = document.getElementById('quickName');
 
 const INITIAL_SPEED = 150;
 const SPEED_INCREASE = 1.5;
@@ -1717,6 +1718,8 @@ saveScoreBtn.addEventListener('click', async () => {
     localStorage.setItem('snakeName', name);
     saveScoreBtn.disabled = true;
     saveStatusEl.textContent = 'Отправка…';
+    quickNameEl.value = name;
+    skinNameEl.value = name;
 
     const ok = await submitScore(name, lastScoreValue);
     isSubmitted = ok;
@@ -1734,6 +1737,29 @@ playerNameEl.addEventListener('keydown', (e) => {
     }
 });
 
+function setPlayerName(raw, from) {
+    const v = (raw || '').trim().slice(0, 16);
+    if (!v) return '';
+    if (from !== 'player') playerNameEl.value = v;
+    if (from !== 'quick') quickNameEl.value = v;
+    if (from !== 'ward') skinNameEl.value = v;
+    localStorage.setItem('snakeName', v);
+    syncNameToProfile();
+    return v;
+}
+
+quickNameEl.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') {
+        e.preventDefault();
+        quickNameEl.blur();
+    }
+});
+
+quickNameEl.addEventListener('change', () => {
+    const v = setPlayerName(quickNameEl.value, 'quick');
+    quickNameEl.value = v || (localStorage.getItem('snakeName') || '');
+});
+
 let authUser = null;
 
 function authProfileName() {
@@ -1749,7 +1775,7 @@ function renderAuth() {
     if (loggedIn) {
         authWhoEl.textContent = 'Ты: ' + (authUser.email || '');
         const n = authProfileName();
-        if (n) playerNameEl.value = n;
+        if (n) setPlayerName(n, 'auth');
     }
 
     saveScoreBtn.textContent = loggedIn ? 'Сохранить результат' : 'В таблицу лидеров';
@@ -2029,10 +2055,7 @@ function saveMyName() {
         skinNameEl.focus();
         return;
     }
-    skinNameEl.value = name;
-    playerNameEl.value = name;
-    localStorage.setItem('snakeName', name);
-    syncNameToProfile();
+    setPlayerName(name, 'ward');
     refreshLeaders();
     setWardStatus('Имя сохранено: ' + name);
 }
@@ -2427,6 +2450,24 @@ buildWardrobe();
 initGame();
 playerNameEl.value = localStorage.getItem('snakeName') || '';
 skinNameEl.value = playerNameEl.value;
+quickNameEl.value = playerNameEl.value;
 refreshLeaders();
 initAuth();
 requestAnimationFrame(renderFrame);
+
+window.__snakeState = {
+    get v() {
+        return {
+            mode: mode,
+            role: role,
+            roomCode: roomCode,
+            countdown: mpCountdown,
+            selfVel: mpSelfVel,
+            otherVel: mpOtherVel,
+            scores: mpScores,
+            over: mpOver,
+            online: mpOpponentOnline,
+            tiles: tileCount
+        };
+    }
+};

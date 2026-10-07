@@ -594,6 +594,31 @@ body {
     background: rgba(56, 189, 248, 0.1);
 }
 
+#quickName {
+    flex: 0 1 150px;
+    min-width: 0;
+    background: rgba(255, 255, 255, 0.08);
+    border: 1px solid rgba(148, 163, 184, 0.35);
+    color: #f1f5f9;
+    font-size: clamp(12px, 2.4vw, 16px);
+    font-weight: 700;
+    padding: clamp(5px, 1vw, 8px) clamp(12px, 2.4vw, 16px);
+    border-radius: 999px;
+    outline: none;
+    text-align: center;
+    transition: border-color 0.15s ease, box-shadow 0.15s ease;
+    max-width: 190px;
+}
+
+    #quickName::placeholder {
+        color: rgba(251, 191, 36, 0.75);
+    }
+
+    #quickName:focus {
+        border-color: rgba(251, 191, 36, 0.7);
+        box-shadow: 0 0 0 3px rgba(251, 191, 36, 0.18);
+    }
+
 #resultTitle {
     font-size: clamp(52px, 16vw, 190px);
     line-height: 0.9;
