@@ -776,9 +776,9 @@ button.mini {
     }
 
 #wardPreview {
-    width: min(340px, 100%);
+    width: min(460px, 100%);
     height: auto;
-    max-height: clamp(56px, 12vh, 86px);
+    max-height: clamp(70px, 16vh, 120px);
     border-radius: 12px;
     box-shadow: 0 8px 30px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(148, 163, 184, 0.16);
 }
@@ -802,6 +802,30 @@ button.mini {
     cursor: not-allowed;
     background: repeating-linear-gradient(135deg, rgba(255,255,255,0.05) 0 6px, rgba(255,255,255,0.11) 6px 12px);
     color: rgba(203, 213, 225, 0.6);
+}
+
+.swatch.trying,
+.ward-chip.trying {
+    opacity: 1;
+    filter: none;
+    border: 2px dashed #fbbf24;
+    box-shadow: 0 0 0 3px rgba(251, 191, 36, 0.3), 0 6px 18px rgba(0, 0, 0, 0.4);
+    color: #fde68a;
+    cursor: pointer;
+    animation: tryOnPulse 1.2s ease-in-out infinite;
+}
+
+.ward-chip.trying {
+    background: rgba(251, 191, 36, 0.16);
+}
+
+@keyframes tryOnPulse {
+    0%, 100% {
+        box-shadow: 0 0 0 3px rgba(251, 191, 36, 0.3), 0 6px 18px rgba(0, 0, 0, 0.4);
+    }
+    50% {
+        box-shadow: 0 0 0 5px rgba(251, 191, 36, 0.45), 0 6px 22px rgba(0, 0, 0, 0.5);
+    }
 }
 
     .ward-chip.locked:hover {
