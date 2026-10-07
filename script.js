@@ -1,5 +1,5 @@
 const canvas = document.getElementById('gameCanvas');
-const ctx = canvas.getContext('2d');
+let ctx = canvas.getContext('2d');
 const stage = canvas.parentElement;
 
 const scoreEl = document.getElementById('score');
@@ -77,6 +77,26 @@ let mpOpponentOnline = false;
 let mpOverlayShown = false;
 let mpJoinTimer = null;
 let mpHostGoneTimer = null;
+
+/* wardrobe */
+const DEFAULT_SKIN = { hue: 145, pattern: 'none', hat: 'none' };
+
+function loadSkin() {
+    try {
+        const s = JSON.parse(localStorage.getItem('snakeSkin'));
+        if (s && typeof s.hue === 'number') {
+            return { hue: s.hue, pattern: s.pattern || 'none', hat: s.hat || 'none' };
+        }
+    } catch (e) { }
+    return { hue: DEFAULT_SKIN.hue, pattern: DEFAULT_SKIN.pattern, hat: DEFAULT_SKIN.hat };
+}
+
+function saveSkin() {
+    localStorage.setItem('snakeSkin', JSON.stringify(playerSkin));
+}
+
+let playerSkin = loadSkin();
+let mpOtherSkin = { hue: 210, pattern: 'none', hat: 'none' };
 let highScore = parseInt(localStorage.getItem('snakeHighScore')) || 0;
 let speed = INITIAL_SPEED;
 
@@ -94,8 +114,9 @@ tabs.forEach(tab => {
 
         const id = tab.dataset.panel;
         const isLeaders = id === 'leaders';
-        panelsEl.classList.toggle('tall', isLeaders || id === 'auth' || id === 'mp');
+        panelsEl.classList.toggle('tall', isLeaders || id === 'auth' || id === 'mp' || id === 'wardrobe');
         if (isLeaders) refreshLeaders();
+        if (id === 'wardrobe') skinNameEl.value = playerNameEl.value || localStorage.getItem('snakeName') || '';
         setTimeout(resizeCanvas, 0);
     });
 });
@@ -705,8 +726,12 @@ function drawFood(t) {
 
 /* ---------------- snake ---------------- */
 
-function drawConnector(x1, y1, x2, y2, tint, hue) {
-    hue = hue === undefined ? 145 : hue;
+function skinHue(skin) {
+    return (skin && typeof skin.hue === 'number') ? skin.hue : 145;
+}
+
+function drawConnector(x1, y1, x2, y2, tint, skin) {
+    const hue = skinHue(skin);
     const dark = `hsl(${hue}, 55%, ${Math.max(22, 34 - tint * 0.12)}%)`;
     const mid = `hsl(${hue}, 60%, ${Math.max(32, 46 - tint * 0.18)}%)`;
     const light = `hsl(${hue}, 65%, ${Math.max(40, 58 - tint * 0.2)}%)`;
@@ -738,8 +763,8 @@ function drawConnector(x1, y1, x2, y2, tint, hue) {
     ctx.restore();
 }
 
-function drawSegment(px, py, index, t, vx, vy, hue) {
-    hue = hue === undefined ? 145 : hue;
+function drawSegment(px, py, index, t, vx, vy, skin) {
+    const hue = skinHue(skin);
     const cx = px * tileSize + tileSize / 2;
     const cy = py * tileSize + tileSize / 2;
     const r = tileSize * 0.46;
@@ -790,9 +815,130 @@ function drawSegment(px, py, index, t, vx, vy, hue) {
     ctx.arc(cx - r * 0.34, cy - r * 0.4, r * 0.09, 0, Math.PI * 2);
     ctx.fill();
 
+    const pattern = isHead ? 'none' : ((skin && skin.pattern) || 'none');
+    if (pattern === 'stripes' && index % 2 === 1) {
+        ctx.save();
+        ctx.beginPath();
+        ctx.arc(cx, cy, r * 0.98, 0, Math.PI * 2);
+        ctx.clip();
+        ctx.fillStyle = `hsla(${hue + 6}, 65%, 22%, 0.35)`;
+        const bandW = r * 0.45;
+        const dx = (vx === undefined || (vx === 0 && vy === 0)) ? 1 : vx;
+        const dy = vy === undefined ? 0 : vy;
+        ctx.translate(cx, cy);
+        ctx.rotate(Math.atan2(dy, dx) + Math.PI / 2);
+        ctx.fillRect(-r, -bandW / 2, r * 2, bandW);
+        ctx.restore();
+    } else if (pattern === 'spots') {
+        ctx.save();
+        ctx.beginPath();
+        ctx.arc(cx, cy, r * 0.98, 0, Math.PI * 2);
+        ctx.clip();
+        ctx.fillStyle = `hsla(${hue + 8}, 70%, 25%, 0.4)`;
+        [[-0.3, -0.25], [0.28, 0.1], [-0.05, 0.42]].forEach(o => {
+            ctx.beginPath();
+            ctx.arc(cx + o[0] * r, cy + o[1] * r, r * 0.17, 0, Math.PI * 2);
+            ctx.fill();
+        });
+        ctx.restore();
+    }
+
     if (isHead) {
+        drawHat(cx, cy, r, vx, vy, (skin && skin.hat) || 'none');
         drawHeadFace(cx, cy, r, t, vx, vy);
     }
+}
+
+function drawHat(cx, cy, r, vx, vy, hat) {
+    if (!hat || hat === 'none') return;
+
+    let fx = vx === undefined ? velocityX : vx;
+    let fy = vy === undefined ? velocityY : vy;
+    if (fx === 0 && fy === 0) { fx = 1; fy = 0; }
+
+    ctx.save();
+    ctx.lineJoin = 'round';
+
+    if (hat === 'crown') {
+        const w = r * 0.85;
+        const h = r * 0.62;
+        const baseY = cy - r * 0.55;
+        ctx.fillStyle = '#fbbf24';
+        ctx.strokeStyle = '#b45309';
+        ctx.lineWidth = Math.max(1, r * 0.06);
+        ctx.beginPath();
+        ctx.moveTo(cx - w, baseY);
+        ctx.lineTo(cx - w, baseY - h);
+        ctx.lineTo(cx - w * 0.45, baseY - h * 0.45);
+        ctx.lineTo(cx, baseY - h);
+        ctx.lineTo(cx + w * 0.45, baseY - h * 0.45);
+        ctx.lineTo(cx + w, baseY - h);
+        ctx.lineTo(cx + w, baseY);
+        ctx.closePath();
+        ctx.fill();
+        ctx.stroke();
+        ctx.fillStyle = '#ef4444';
+        ctx.beginPath();
+        ctx.arc(cx, baseY - h * 0.18, r * 0.1, 0, Math.PI * 2);
+        ctx.fill();
+    } else if (hat === 'party') {
+        const baseY = cy - r * 0.5;
+        const topX = cx - fx * r * 0.18;
+        const topY = baseY - r * 1.5;
+        ctx.fillStyle = '#f43f5e';
+        ctx.beginPath();
+        ctx.moveTo(cx - r * 0.75, baseY);
+        ctx.lineTo(topX, topY);
+        ctx.lineTo(cx + r * 0.75, baseY);
+        ctx.closePath();
+        ctx.fill();
+        ctx.strokeStyle = 'rgba(255,255,255,0.75)';
+        ctx.lineWidth = Math.max(1, r * 0.1);
+        for (let i = 1; i <= 2; i++) {
+            const k = i / 3;
+            const y = baseY + (topY - baseY) * k;
+            const half = r * 0.75 * (1 - k);
+            ctx.beginPath();
+            ctx.moveTo(cx - half, y);
+            ctx.lineTo(cx + half, y);
+            ctx.stroke();
+        }
+        ctx.fillStyle = '#ffffff';
+        ctx.beginPath();
+        ctx.arc(topX, topY, r * 0.16, 0, Math.PI * 2);
+        ctx.fill();
+    } else if (hat === 'cap') {
+        const topY = cy - r * 0.35;
+        ctx.fillStyle = '#38bdf8';
+        ctx.beginPath();
+        ctx.arc(cx, topY, r * 0.72, Math.PI, 0);
+        ctx.lineTo(cx + r * 0.72, topY);
+        ctx.closePath();
+        ctx.fill();
+        ctx.fillStyle = '#0284c7';
+        ctx.beginPath();
+        ctx.ellipse(cx + fx * r * 0.62, topY + fy * r * 0.55, r * 0.5, r * 0.24, 0, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = '#f8fafc';
+        ctx.beginPath();
+        ctx.arc(cx, topY - r * 0.05, r * 0.1, 0, Math.PI * 2);
+        ctx.fill();
+    } else if (hat === 'helm') {
+        ctx.fillStyle = '#94a3b8';
+        ctx.strokeStyle = '#475569';
+        ctx.lineWidth = Math.max(1, r * 0.07);
+        ctx.beginPath();
+        ctx.arc(cx, cy, r * 0.92, Math.PI * 1.02, Math.PI * 1.98);
+        ctx.closePath();
+        ctx.fill();
+        ctx.stroke();
+        ctx.fillStyle = 'rgba(15,23,42,0.55)';
+        ctx.beginPath();
+        ctx.ellipse(cx + fx * r * 0.42, cy + fy * r * 0.42, r * 0.42, r * 0.3, Math.atan2(fy, fx), 0, Math.PI * 2);
+        ctx.fill();
+    }
+
+    ctx.restore();
 }
 
 function drawHeadFace(cx, cy, r, t, vx, vy) {
@@ -847,7 +993,7 @@ function drawHeadFace(cx, cy, r, t, vx, vy) {
     }
 }
 
-function drawSnakeSet(segments, vx, vy, hue, t) {
+function drawSnakeSet(segments, vx, vy, skin, t) {
     if (!segments || segments.length === 0) return;
 
     for (let i = 0; i < segments.length - 1; i++) {
@@ -865,18 +1011,18 @@ function drawSnakeSet(segments, vx, vy, hue, t) {
             const py = p.y * tileSize + tileSize / 2;
             const ox = px - ax;
             const oy = py - ay;
-            drawConnector(px, py, bx + ox, by + oy, i, hue);
+            drawConnector(px, py, bx + ox, by + oy, i, skin);
         });
     }
 
     for (let i = segments.length - 1; i >= 0; i--) {
         const s = segments[i];
-        wrappedCopies(s).forEach(p => drawSegment(p.x, p.y, i, t, vx, vy, hue));
+        wrappedCopies(s).forEach(p => drawSegment(p.x, p.y, i, t, vx, vy, skin));
     }
 }
 
 function drawSnake(t) {
-    drawSnakeSet(snake, velocityX, velocityY, 145, t);
+    drawSnakeSet(snake, velocityX, velocityY, playerSkin, t);
 }
 
 function drawCountdown() {
@@ -899,8 +1045,8 @@ function draw(t) {
     drawFood(t);
 
     if (mode === 'mp') {
-        drawSnakeSet(mpOther, mpOtherVel.x, mpOtherVel.y, 205, t);
-        drawSnakeSet(mpSelf, mpSelfVel.x, mpSelfVel.y, 145, t);
+        drawSnakeSet(mpOther, mpOtherVel.x, mpOtherVel.y, mpOtherSkin, t);
+        drawSnakeSet(mpSelf, mpSelfVel.x, mpSelfVel.y, playerSkin, t);
         if (mpCountdown > 0) drawCountdown();
     } else {
         drawSnake(t);
@@ -908,7 +1054,9 @@ function draw(t) {
 }
 
 function renderFrame(now) {
-    draw(now / 1000);
+    const t = now / 1000;
+    draw(t);
+    if (wardPanelEl.classList.contains('active')) drawWardrobePreview(t);
     requestAnimationFrame(renderFrame);
 }
 
@@ -1137,7 +1285,8 @@ function mpBroadcast() {
         f: [food.x, food.y, food.type],
         sc: mpScores.slice(),
         over: mpOver,
-        w: mpWinner
+        w: mpWinner,
+        sk: [playerSkin, mpOtherSkin]
     });
 }
 
@@ -1193,7 +1342,7 @@ function mpHostTick() {
 }
 
 function onMpState(st) {
-    if (role !== 'guest') return;
+    if (role !== 'guest' || !st.s1 || !st.s2 || !st.s1.length || !st.s2.length) return;
 
     if (st.tc) applyTileCount(st.tc);
 
@@ -1206,6 +1355,7 @@ function onMpState(st) {
     mpCountdown = st.c;
     mpOver = st.over;
     mpWinner = st.w;
+    if (st.sk && st.sk[0]) mpOtherSkin = st.sk[0];
 
     mpUpdateHud();
 
@@ -1298,6 +1448,7 @@ function connectRoom(code, asHost) {
     mpStateSeen = false;
     mpOver = false;
     isGameOver = false;
+    mpOtherSkin = { hue: 210, pattern: 'none', hat: 'none' };
     gameOverEl.classList.add('hidden');
     roomUi(true);
 
@@ -1310,6 +1461,12 @@ function connectRoom(code, asHost) {
         onMpState(msg.payload);
     });
     channel.on('broadcast', { event: 'dir' }, (msg) => onMpDir(msg.payload));
+    channel.on('broadcast', { event: 'skin' }, (msg) => {
+        if (role === 'host' && msg.payload && typeof msg.payload.hue === 'number') {
+            mpOtherSkin = msg.payload;
+            if (mpSelf.length) mpBroadcast();
+        }
+    });
     channel.on('broadcast', { event: 'again' }, () => {
         if (role === 'host' && mpOver) mpStartRound();
     });
@@ -1321,6 +1478,7 @@ function connectRoom(code, asHost) {
             if (role === 'host') {
                 mpStatus('Код: ' + code + ' — ждём соперника…');
             } else {
+                mpSend('skin', playerSkin);
                 mpStatus('Подключение…');
                 clearTimeout(mpJoinTimer);
                 mpJoinTimer = setTimeout(() => {
@@ -1360,7 +1518,175 @@ function leaveRoom(silent) {
     roomUi(false);
 
     if (!silent && wasMp) {
-        initGame();
+/* ---------------- wardrobe ---------------- */
+
+const HUE_SWATCHES = [
+    { label: 'Зелёный', hue: 145 },
+    { label: 'Синий', hue: 210 },
+    { label: 'Бирюзовый', hue: 175 },
+    { label: 'Фиолетовый', hue: 275 },
+    { label: 'Красный', hue: 355 },
+    { label: 'Оранжевый', hue: 28 },
+    { label: 'Жёлтый', hue: 48 },
+    { label: 'Розовый', hue: 330 }
+];
+
+const PATTERN_OPTIONS = [
+    { id: 'none', label: 'Нет' },
+    { id: 'stripes', label: 'Полосы' },
+    { id: 'spots', label: 'Точки' }
+];
+
+const HAT_OPTIONS = [
+    { id: 'none', label: 'Без шапки' },
+    { id: 'crown', label: 'Корона' },
+    { id: 'party', label: 'Колпак' },
+    { id: 'cap', label: 'Кепка' },
+    { id: 'helm', label: 'Шлем' }
+];
+
+const wardPanelEl = document.getElementById('panel-wardrobe');
+const wardPreviewEl = document.getElementById('wardPreview');
+const skinNameEl = document.getElementById('skinName');
+const skinNameBtn = document.getElementById('skinNameBtn');
+const wardStatusEl = document.getElementById('wardStatus');
+const hueSwatchesEl = document.getElementById('hueSwatches');
+const patternBtnsEl = document.getElementById('patternBtns');
+const hatBtnsEl = document.getElementById('hatBtns');
+
+function wardMarkActive() {
+    hueSwatchesEl.querySelectorAll('button').forEach(b =>
+        b.classList.toggle('active', Number(b.dataset.hue) === playerSkin.hue));
+    patternBtnsEl.querySelectorAll('button').forEach(b =>
+        b.classList.toggle('active', b.dataset.pattern === playerSkin.pattern));
+    hatBtnsEl.querySelectorAll('button').forEach(b =>
+        b.classList.toggle('active', b.dataset.hat === playerSkin.hat));
+}
+
+function setWardStatus(text) {
+    wardStatusEl.textContent = text;
+}
+
+function notifySkinChanged() {
+    if (role === 'guest') mpSend('skin', playerSkin);
+}
+
+function applySkin() {
+    saveSkin();
+    wardMarkActive();
+    notifySkinChanged();
+}
+
+function buildWardrobe() {
+    HUE_SWATCHES.forEach(s => {
+        const b = document.createElement('button');
+        b.className = 'swatch';
+        b.type = 'button';
+        b.dataset.hue = s.hue;
+        b.title = s.label;
+        b.style.background = `hsl(${s.hue}, 65%, 52%)`;
+        b.addEventListener('click', () => {
+            playerSkin.hue = s.hue;
+            applySkin();
+        });
+        hueSwatchesEl.appendChild(b);
+    });
+
+    PATTERN_OPTIONS.forEach(p => {
+        const b = document.createElement('button');
+        b.className = 'ward-chip';
+        b.type = 'button';
+        b.dataset.pattern = p.id;
+        b.textContent = p.label;
+        b.addEventListener('click', () => {
+            playerSkin.pattern = p.id;
+            applySkin();
+        });
+        patternBtnsEl.appendChild(b);
+    });
+
+    HAT_OPTIONS.forEach(h => {
+        const b = document.createElement('button');
+        b.className = 'ward-chip';
+        b.type = 'button';
+        b.dataset.hat = h.id;
+        b.textContent = h.label;
+        b.addEventListener('click', () => {
+            playerSkin.hat = h.id;
+            applySkin();
+        });
+        hatBtnsEl.appendChild(b);
+    });
+
+    wardMarkActive();
+}
+
+function saveMyName() {
+    const name = (skinNameEl.value || '').trim().slice(0, 16);
+    if (!name) {
+        setWardStatus('Имя не может быть пустым');
+        skinNameEl.focus();
+        return;
+    }
+    skinNameEl.value = name;
+    playerNameEl.value = name;
+    localStorage.setItem('snakeName', name);
+    syncNameToProfile();
+    refreshLeaders();
+    setWardStatus('Имя сохранено: ' + name);
+}
+
+skinNameBtn.addEventListener('click', saveMyName);
+skinNameEl.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') {
+        e.preventDefault();
+        saveMyName();
+    }
+});
+
+function drawWardrobePreview(t) {
+    const prevCtx = ctx;
+    const prevTile = tileSize;
+    const prevCount = tileCount;
+
+    ctx = wardPreviewEl.getContext('2d');
+    tileCount = 50;
+    tileSize = 26;
+
+    const w = wardPreviewEl.width;
+    const h = wardPreviewEl.height;
+
+    const bg = ctx.createLinearGradient(0, 0, w, h);
+    bg.addColorStop(0, '#0b1220');
+    bg.addColorStop(1, '#111c33');
+    ctx.fillStyle = bg;
+    ctx.fillRect(0, 0, w, h);
+
+    ctx.strokeStyle = 'rgba(148,163,184,0.16)';
+    ctx.lineWidth = 2;
+    ctx.strokeRect(1, 1, w - 2, h - 2);
+
+    const cy = 1;
+    const seg = [
+        { x: 7, y: cy },
+        { x: 6, y: cy },
+        { x: 5, y: cy },
+        { x: 4, y: cy },
+        { x: 3, y: cy },
+        { x: 2, y: cy }
+    ];
+
+    FRUITS[0](w - 46, cy * tileSize + tileSize / 2, tileSize * 0.5, t);
+    drawSnakeSet(seg, 1, 0, playerSkin, t);
+
+    ctx = prevCtx;
+    tileSize = prevTile;
+    tileCount = prevCount;
+}
+
+buildWardrobe();
+
+initGame();
         mpStatus('Создай комнату или введи код друга');
     }
 }
@@ -1669,6 +1995,7 @@ authLogoutBtn.addEventListener('click', async () => {
 
 initGame();
 playerNameEl.value = localStorage.getItem('snakeName') || '';
+skinNameEl.value = playerNameEl.value;
 refreshLeaders();
 initAuth();
 requestAnimationFrame(renderFrame);

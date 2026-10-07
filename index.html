@@ -17,6 +17,7 @@
                 <button class="tab" data-panel="pad">Кнопки</button>
                 <button class="tab" data-panel="leaders">Лидеры</button>
                 <button class="tab" data-panel="auth">Вход</button>
+                <button class="tab" data-panel="wardrobe">Гардероб</button>
                 <button class="tab" data-panel="mp">Мультиплеер</button>
             </nav>
 
@@ -87,6 +88,35 @@
                 </div>
 
                 <p id="authStatus" class="auth-status"></p>
+            </div>
+
+            <div class="panel" id="panel-wardrobe">
+                <div class="wardrobe">
+                    <div class="ward-row">
+                        <span class="ward-label">Имя</span>
+                        <input id="skinName" type="text" maxlength="16" placeholder="Придумай имя"
+                               autocomplete="off">
+                        <button id="skinNameBtn" class="ghost mini">Сохранить</button>
+                    </div>
+
+                    <div class="ward-row">
+                        <span class="ward-label">Цвет</span>
+                        <div class="swatches" id="hueSwatches"></div>
+                    </div>
+
+                    <div class="ward-row">
+                        <span class="ward-label">Детали</span>
+                        <div class="chips-row" id="patternBtns"></div>
+                    </div>
+
+                    <div class="ward-row">
+                        <span class="ward-label">Шапка</span>
+                        <div class="chips-row" id="hatBtns"></div>
+                    </div>
+
+                    <canvas id="wardPreview" width="320" height="86"></canvas>
+                    <p id="wardStatus" class="auth-status"></p>
+                </div>
             </div>
 
             <div class="panel" id="panel-mp">
