@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="ru">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Змейка</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+    <div class="game-wrapper">
+        <header class="top-bar">
+            <nav class="tabs" id="tabs">
+                <button class="tab active" data-panel="score">Счёт</button>
+                <button class="tab" data-panel="controls">Управление</button>
+                <button class="tab" data-panel="pad">Кнопки</button>
+                <button class="tab" data-panel="leaders">Лидеры</button>
+            </nav>
+
+            <button id="fullscreenBtn" title="Полный экран (F11)">
+                <svg class="icon-expand" width="20" height="20" viewBox="0 0 24 24" fill="none"
+                     xmlns="http://www.w3.org/2000/svg">
+                    <path d="M3 8V5C3 4.46957 3.21071 3.96086 3.58579 3.58579C3.96086 3.21071 4.46957 3 5 3H8"
+                          stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" />
+                    <path d="M16 3H19C19.5304 3 20.0391 3.21071 20.4142 3.58579C20.7893 3.96086 21 4.46957 21 5V8"
+                          stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" />
+                    <path d="M21 16V19C21 19.5304 20.7893 20.0391 20.4142 20.4142C20.0391 20.7893 19.5304 21 19 21H16"
+                          stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" />
+                    <path d="M8 21H5C4.46957 21 3.96086 20.7893 3.58579 20.4142C3.21071 20.0391 3 19.5304 3 19V16"
+                          stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" />
+                </svg>
+
+                <svg class="icon-compress hidden" width="20" height="20" viewBox="0 0 24 24" fill="none"
+                     xmlns="http://www.w3.org/2000/svg">
+                    <path d="M8 3V5C8 5.53043 7.78929 6.03914 7.41421 6.41421C7.03914 6.78929 6.53043 7 6 7H4"
+                          stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" />
+                    <path d="M20 8H18C17.4696 8 16.9609 7.78929 16.5858 7.41421C16.2107 7.03914 16 6.53043 16 6V4"
+                          stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" />
+                    <path d="M16 20V18C16 17.4696 16.2107 16.9609 16.5858 16.5858C16.9609 16.2107 17.4696 16 18 16H20"
+                          stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" />
+                    <path d="M4 16H6C6.53043 16 7.03914 16.2107 7.41421 16.5858C7.78929 16.9609 8 17.4696 8 18V20"
+                          stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" />
+                </svg>
+            </button>
+        </header>
+
+        <div class="panels" id="panels">
+            <div class="panel active" id="panel-score">
+                <div class="chip score">Счёт: <span id="score">0</span></div>
+                <div class="chip high-score">Лучший: <span id="highScore">0</span></div>
+            </div>
+
+            <div class="panel" id="panel-controls">
+                <p class="controls-info">Стрелки или WASD — движение • Пробел — пауза • F11 — полный экран</p>
+            </div>
+
+            <div class="panel" id="panel-pad">
+                <div class="mobile-controls">
+                    <button class="dir-btn" data-dir="left">◀</button>
+                    <button class="dir-btn" data-dir="up">▲</button>
+                    <button class="dir-btn" data-dir="down">▼</button>
+                    <button class="dir-btn" data-dir="right">▶</button>
+                </div>
+            </div>
+
+            <div class="panel" id="panel-leaders">
+                <ol id="leadersList" class="leaders-list">
+                    <li class="leaders-empty">Загрузка…</li>
+                </ol>
+            </div>
+        </div>
+
+        <div class="stage">
+            <canvas id="gameCanvas"></canvas>
+
+            <div id="gameOver" class="overlay hidden">
+                <h1 class="loser">LOSER</h1>
+                <p>Твой счёт: <span id="finalScore">0</span></p>
+                <div class="save-row">
+                    <input id="playerName" type="text" maxlength="16" placeholder="Твоё имя" autocomplete="off">
+                    <button id="saveScoreBtn">В таблицу лидеров</button>
+                </div>
+                <p id="saveStatus" class="save-status"></p>
+                <button id="restartBtn">Играть снова</button>
+            </div>
+
+            <div id="pause" class="overlay hidden">Пауза</div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="supabase-config.js"></script>
+    <script src="script.js"></script>
+</body>
+
+</html>
