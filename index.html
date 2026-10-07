@@ -114,6 +114,12 @@
                         <div class="chips-row" id="hatBtns"></div>
                     </div>
 
+                    <div class="ward-row">
+                        <span class="ward-label">Награды</span>
+                        <button id="wardChestBtn" class="chest-btn hidden">Открыть сундук</button>
+                        <span id="wardChestHint" class="ward-hint">Сундук падает за 1 место в мультиплеере</span>
+                    </div>
+
                     <canvas id="wardPreview" width="320" height="86"></canvas>
                     <p id="wardStatus" class="auth-status"></p>
                 </div>
@@ -138,6 +144,7 @@
                 <h1 class="loser" id="resultTitle">LOSER</h1>
                 <p id="soloResult">Твой счёт: <span id="finalScore">0</span></p>
                 <p id="mpResult" class="hidden">Ты: <span id="mpScoreYou">0</span> • Соперник: <span id="mpScoreFoe">0</span></p>
+                <button id="chestBtn" class="chest-btn hidden">Открыть сундук</button>
                 <div class="save-row">
                     <input id="playerName" type="text" maxlength="16" placeholder="Твоё имя" autocomplete="off">
                     <button id="saveScoreBtn">В таблицу лидеров</button>
@@ -147,6 +154,18 @@
             </div>
 
             <div id="pause" class="overlay hidden">Пауза</div>
+        </div>
+
+        <div id="chestOverlay" class="chest-overlay hidden">
+            <div class="chest-box">
+                <h2 class="chest-title">Сундук с уроборосом</h2>
+                <canvas id="chestCanvas" width="280" height="250"></canvas>
+                <p id="chestResult" class="chest-result"></p>
+                <div class="chest-actions">
+                    <button id="chestOpenBtn">Открыть</button>
+                    <button id="chestCloseBtn" class="ghost">Закрыть</button>
+                </div>
+            </div>
         </div>
     </div>
 

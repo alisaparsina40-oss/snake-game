@@ -95,7 +95,32 @@ function saveSkin() {
     localStorage.setItem('snakeSkin', JSON.stringify(playerSkin));
 }
 
+const BASE_HUE = 145;
+
+function loadUnlocks() {
+    try {
+        const u = JSON.parse(localStorage.getItem('snakeUnlocks'));
+        if (u && Array.isArray(u.hues) && u.hues.indexOf(BASE_HUE) >= 0) {
+            return {
+                hues: u.hues,
+                patterns: Array.isArray(u.patterns) && u.patterns.length ? u.patterns : ['none'],
+                hats: Array.isArray(u.hats) && u.hats.length ? u.hats : ['none'],
+                chests: Math.max(0, parseInt(u.chests) || 0)
+            };
+        }
+    } catch (e) { }
+    return { hues: [BASE_HUE], patterns: ['none'], hats: ['none'], chests: 0 };
+}
+
+function saveUnlocks() {
+    localStorage.setItem('snakeUnlocks', JSON.stringify(unlocks));
+}
+
+let unlocks = loadUnlocks();
 let playerSkin = loadSkin();
+if (unlocks.hues.indexOf(playerSkin.hue) < 0) playerSkin.hue = BASE_HUE;
+if (unlocks.patterns.indexOf(playerSkin.pattern) < 0) playerSkin.pattern = 'none';
+if (unlocks.hats.indexOf(playerSkin.hat) < 0) playerSkin.hat = 'none';
 let mpOtherSkin = { hue: 210, pattern: 'none', hat: 'none' };
 let highScore = parseInt(localStorage.getItem('snakeHighScore')) || 0;
 let speed = INITIAL_SPEED;
@@ -1198,6 +1223,7 @@ function showResultOverlay(kind) {
     if (kind === 'win') {
         resultTitleEl.textContent = 'WINNER!';
         resultTitleEl.classList.add('winner');
+        grantChest();
     } else if (kind === 'draw') {
         resultTitleEl.textContent = 'НИЧЬЯ';
         resultTitleEl.classList.add('draw');
@@ -1218,6 +1244,8 @@ function showResultOverlay(kind) {
         isSubmitted = false;
         saveScoreBtn.disabled = false;
         saveStatusEl.textContent = '';
+        updateChestUi();
+        chestBtn.classList.toggle('hidden', unlocks.chests === 0);
     }
 
     gameOverEl.classList.remove('hidden');
@@ -1553,14 +1581,33 @@ const wardStatusEl = document.getElementById('wardStatus');
 const hueSwatchesEl = document.getElementById('hueSwatches');
 const patternBtnsEl = document.getElementById('patternBtns');
 const hatBtnsEl = document.getElementById('hatBtns');
+const wardChestBtn = document.getElementById('wardChestBtn');
+const wardChestHint = document.getElementById('wardChestHint');
+const chestBtn = document.getElementById('chestBtn');
+const chestOverlayEl = document.getElementById('chestOverlay');
+const chestCanvasEl = document.getElementById('chestCanvas');
+const chestResultEl = document.getElementById('chestResult');
+const chestOpenBtn = document.getElementById('chestOpenBtn');
+const chestCloseBtn = document.getElementById('chestCloseBtn');
+
+function isHueOpen(hue) { return unlocks.hues.indexOf(hue) >= 0; }
+function isPatternOpen(id) { return unlocks.patterns.indexOf(id) >= 0; }
+function isHatOpen(id) { return unlocks.hats.indexOf(id) >= 0; }
 
 function wardMarkActive() {
-    hueSwatchesEl.querySelectorAll('button').forEach(b =>
-        b.classList.toggle('active', Number(b.dataset.hue) === playerSkin.hue));
-    patternBtnsEl.querySelectorAll('button').forEach(b =>
-        b.classList.toggle('active', b.dataset.pattern === playerSkin.pattern));
-    hatBtnsEl.querySelectorAll('button').forEach(b =>
-        b.classList.toggle('active', b.dataset.hat === playerSkin.hat));
+    hueSwatchesEl.querySelectorAll('button').forEach(b => {
+        const hue = Number(b.dataset.hue);
+        b.classList.toggle('active', hue === playerSkin.hue);
+        b.classList.toggle('locked', !isHueOpen(hue));
+    });
+    patternBtnsEl.querySelectorAll('button').forEach(b => {
+        b.classList.toggle('active', b.dataset.pattern === playerSkin.pattern);
+        b.classList.toggle('locked', !isPatternOpen(b.dataset.pattern));
+    });
+    hatBtnsEl.querySelectorAll('button').forEach(b => {
+        b.classList.toggle('active', b.dataset.hat === playerSkin.hat);
+        b.classList.toggle('locked', !isHatOpen(b.dataset.hat));
+    });
 }
 
 function setWardStatus(text) {
@@ -1586,6 +1633,10 @@ function buildWardrobe() {
         b.title = s.label;
         b.style.background = `hsl(${s.hue}, 65%, 52%)`;
         b.addEventListener('click', () => {
+            if (!isHueOpen(s.hue)) {
+                setWardStatus('Закрыто — получи сундук за 1 место в мультиплеере');
+                return;
+            }
             playerSkin.hue = s.hue;
             applySkin();
         });
@@ -1599,6 +1650,10 @@ function buildWardrobe() {
         b.dataset.pattern = p.id;
         b.textContent = p.label;
         b.addEventListener('click', () => {
+            if (!isPatternOpen(p.id)) {
+                setWardStatus('Закрыто — получи сундук за 1 место в мультиплеере');
+                return;
+            }
             playerSkin.pattern = p.id;
             applySkin();
         });
@@ -1612,6 +1667,10 @@ function buildWardrobe() {
         b.dataset.hat = h.id;
         b.textContent = h.label;
         b.addEventListener('click', () => {
+            if (!isHatOpen(h.id)) {
+                setWardStatus('Закрыто — получи сундук за 1 место в мультиплеере');
+                return;
+            }
             playerSkin.hat = h.id;
             applySkin();
         });
@@ -1619,6 +1678,7 @@ function buildWardrobe() {
     });
 
     wardMarkActive();
+    updateChestUi();
 }
 
 function saveMyName() {
@@ -1643,6 +1703,337 @@ skinNameEl.addEventListener('keydown', (e) => {
         saveMyName();
     }
 });
+
+/* ---------------- chests ---------------- */
+
+const chestCtx = chestCanvasEl.getContext('2d');
+let chestState = 'closed';
+let chestAnimStart = 0;
+let chestFrameId = null;
+let pendingItem = null;
+
+function grantChest() {
+    unlocks.chests++;
+    saveUnlocks();
+    updateChestUi();
+}
+
+function updateChestUi() {
+    const n = unlocks.chests;
+    const label = n > 0 ? 'Открыть сундук (' + n + ')' : 'Открыть сундук';
+    chestBtn.textContent = label;
+    wardChestBtn.textContent = label;
+    chestBtn.classList.toggle('hidden', n === 0);
+    wardChestBtn.classList.toggle('hidden', n === 0);
+    wardChestHint.classList.toggle('hidden', n > 0);
+}
+
+function randomLockedItem() {
+    const pool = [];
+    HUE_SWATCHES.forEach(s => {
+        if (!isHueOpen(s.hue)) pool.push({ type: 'hue', id: s.hue, label: 'цвет «' + s.label + '»' });
+    });
+    PATTERN_OPTIONS.forEach(p => {
+        if (p.id !== 'none' && !isPatternOpen(p.id)) pool.push({ type: 'pattern', id: p.id, label: 'детали «' + p.label + '»' });
+    });
+    HAT_OPTIONS.forEach(h => {
+        if (h.id !== 'none' && !isHatOpen(h.id)) pool.push({ type: 'hat', id: h.id, label: 'шапка «' + h.label + '»' });
+    });
+    if (!pool.length) return null;
+    return pool[Math.floor(Math.random() * pool.length)];
+}
+
+function openChestModal() {
+    chestState = 'closed';
+    pendingItem = null;
+    chestResultEl.textContent = 'Сундук заперт — нажми «Открыть»';
+    chestOpenBtn.textContent = 'Открыть';
+    chestOpenBtn.disabled = false;
+    chestCloseBtn.disabled = false;
+    chestOverlayEl.classList.remove('hidden');
+    chestAnimStart = performance.now();
+    cancelAnimationFrame(chestFrameId);
+    chestFrameId = requestAnimationFrame(chestFrame);
+}
+
+function closeChestModal() {
+    cancelAnimationFrame(chestFrameId);
+    chestFrameId = null;
+    chestState = 'closed';
+    pendingItem = null;
+    chestOverlayEl.classList.add('hidden');
+}
+
+function revealChestItem() {
+    chestState = 'opened';
+    pendingItem = randomLockedItem();
+
+    if (pendingItem) {
+        if (pendingItem.type === 'hue') unlocks.hues.push(pendingItem.id);
+        else if (pendingItem.type === 'pattern') unlocks.patterns.push(pendingItem.id);
+        else unlocks.hats.push(pendingItem.id);
+        saveUnlocks();
+        wardMarkActive();
+        setWardStatus('Новое в гардеробе: ' + pendingItem.label);
+    }
+
+    chestResultEl.textContent = pendingItem
+        ? 'Получено: ' + pendingItem.label
+        : 'Все награды уже собраны!';
+    chestOpenBtn.textContent = 'Забрать';
+    chestOpenBtn.disabled = false;
+    chestCloseBtn.disabled = true;
+    updateChestUi();
+}
+
+chestBtn.addEventListener('click', openChestModal);
+wardChestBtn.addEventListener('click', openChestModal);
+
+chestCloseBtn.addEventListener('click', closeChestModal);
+
+chestOpenBtn.addEventListener('click', () => {
+    if (chestState === 'closed') {
+        if (unlocks.chests < 1) {
+            closeChestModal();
+            return;
+        }
+        unlocks.chests--;
+        saveUnlocks();
+        updateChestUi();
+        chestState = 'opening';
+        chestAnimStart = performance.now();
+        chestOpenBtn.disabled = true;
+        chestCloseBtn.disabled = true;
+        chestResultEl.textContent = 'Сундук открывается…';
+    } else if (chestState === 'opened') {
+        closeChestModal();
+    }
+});
+
+function chestFrame(now) {
+    if (chestState === 'opening' && now - chestAnimStart >= 1400) revealChestItem();
+    const t = now / 1000;
+    drawChestScene(t);
+    drawChestReveal(t);
+    chestFrameId = requestAnimationFrame(chestFrame);
+}
+
+function roundRectPath(g, x, y, w, h, r) {
+    g.beginPath();
+    g.moveTo(x + r, y);
+    g.lineTo(x + w - r, y);
+    g.arcTo(x + w, y, x + w, y + r, r);
+    g.lineTo(x + w, y + h - r);
+    g.arcTo(x + w, y + h, x + w - r, y + h, r);
+    g.lineTo(x + r, y + h);
+    g.arcTo(x, y + h, x, y + h - r, r);
+    g.lineTo(x, y + r);
+    g.arcTo(x, y, x + r, y, r);
+    g.closePath();
+}
+
+function drawOuroboros(g, cx, cy, R, t, glow) {
+    const N = 14;
+    g.save();
+
+    if (glow > 0) {
+        g.shadowColor = 'rgba(74,222,128,0.95)';
+        g.shadowBlur = 8 + glow * 14 + Math.sin(t * 6) * 4;
+    }
+
+    for (let i = N - 1; i >= 1; i--) {
+        const a = -Math.PI / 2 + (i / N) * Math.PI * 1.94;
+        const x = cx + Math.cos(a) * R;
+        const y = cy + Math.sin(a) * R;
+        const light = Math.max(26, 58 - i * 2.2);
+        g.fillStyle = `hsl(${BASE_HUE}, 62%, ${light}%)`;
+        g.beginPath();
+        g.arc(x, y, R * 0.17 * (1 - i / N * 0.45), 0, Math.PI * 2);
+        g.fill();
+    }
+
+    g.shadowBlur = glow > 0 ? 10 + glow * 12 : 0;
+    const hx = cx;
+    const hy = cy - R;
+    g.fillStyle = `hsl(${BASE_HUE}, 65%, 48%)`;
+    g.beginPath();
+    g.arc(hx, hy, R * 0.24, 0, Math.PI * 2);
+    g.fill();
+
+    g.fillStyle = '#0b1120';
+    g.beginPath();
+    g.arc(hx - R * 0.07, hy - R * 0.06, Math.max(1.4, R * 0.06), 0, Math.PI * 2);
+    g.fill();
+
+    g.shadowBlur = 0;
+    g.strokeStyle = '#f43f5e';
+    g.lineWidth = Math.max(1.2, R * 0.06);
+    g.lineCap = 'round';
+    g.beginPath();
+    g.moveTo(hx - R * 0.2, hy + R * 0.04);
+    g.lineTo(hx - R * 0.55, hy + R * 0.02);
+    g.stroke();
+    g.beginPath();
+    g.moveTo(hx - R * 0.55, hy + R * 0.02);
+    g.lineTo(hx - R * 0.7, hy - R * 0.1);
+    g.moveTo(hx - R * 0.55, hy + R * 0.02);
+    g.lineTo(hx - R * 0.7, hy + R * 0.14);
+    g.stroke();
+
+    g.restore();
+}
+
+function drawChestScene(t) {
+    const g = chestCtx;
+    const W = chestCanvasEl.width;
+    const H = chestCanvasEl.height;
+    g.clearRect(0, 0, W, H);
+
+    const elapsed = chestState === 'closed' ? 0 : (performance.now() - chestAnimStart);
+    let shake = 0, lidLift = 0, beam = 0, glow = 0.35 + Math.sin(t * 2) * 0.15;
+
+    if (chestState === 'opening') {
+        const p = Math.min(1, elapsed / 1400);
+        shake = Math.sin(elapsed / 28) * 7 * Math.min(1, p * 4) * (1 - p * 0.5);
+        glow = Math.min(1, p * 1.3);
+        lidLift = p > 0.8 ? (p - 0.8) / 0.2 : 0;
+        beam = lidLift;
+    } else if (chestState === 'opened') {
+        shake = Math.sin(t * 3) * 1.5;
+        glow = 1;
+        lidLift = 1;
+        beam = 1;
+    }
+
+    const cx = W / 2 + shake;
+    const bodyX = cx - 95;
+    const bodyY = 152;
+    const bodyW = 190;
+    const bodyH = 74;
+    const lidX = bodyX;
+    const lidY = bodyY - 44;
+    const lidH = 48;
+
+    if (glow > 0.05) {
+        const rg = g.createRadialGradient(cx, 160, 8, cx, 160, 140);
+        rg.addColorStop(0, `rgba(251,191,36,${0.4 * glow})`);
+        rg.addColorStop(1, 'rgba(251,191,36,0)');
+        g.fillStyle = rg;
+        g.fillRect(0, 0, W, H);
+    }
+
+    if (beam > 0) {
+        const bg = g.createLinearGradient(0, 30, 0, bodyY);
+        bg.addColorStop(0, `rgba(251,191,36,0)`);
+        bg.addColorStop(1, `rgba(255,237,160,${0.55 * beam})`);
+        g.fillStyle = bg;
+        g.beginPath();
+        g.moveTo(cx - 68, bodyY);
+        g.lineTo(cx + 68, bodyY);
+        g.lineTo(cx + 26, 30);
+        g.lineTo(cx - 26, 30);
+        g.closePath();
+        g.fill();
+    }
+
+    const bodyGrad = g.createLinearGradient(0, bodyY, 0, bodyY + bodyH);
+    bodyGrad.addColorStop(0, '#8a5a2b');
+    bodyGrad.addColorStop(1, '#543417');
+    g.fillStyle = bodyGrad;
+    g.strokeStyle = '#3a2410';
+    g.lineWidth = 3;
+    roundRectPath(g, bodyX, bodyY, bodyW, bodyH, 8);
+    g.fill();
+    g.stroke();
+
+    if (beam > 0) {
+        const inner = g.createLinearGradient(0, bodyY, 0, bodyY + 26);
+        inner.addColorStop(0, `rgba(255,235,150,${0.85 * beam})`);
+        inner.addColorStop(1, 'rgba(120,70,20,0)');
+        g.fillStyle = inner;
+        g.fillRect(bodyX + 12, bodyY, bodyW - 24, 26);
+    }
+
+    g.fillStyle = '#c9a227';
+    g.fillRect(bodyX + 22, bodyY, 14, bodyH);
+    g.fillRect(bodyX + bodyW - 36, bodyY, 14, bodyH);
+    g.fillStyle = 'rgba(255,255,255,0.25)';
+    g.fillRect(bodyX + 22, bodyY, 4, bodyH);
+    g.fillRect(bodyX + bodyW - 36, bodyY, 4, bodyH);
+
+    g.fillStyle = '#e0b73a';
+    g.strokeStyle = '#7c5a12';
+    g.lineWidth = 2;
+    roundRectPath(g, cx - 17, bodyY + 22, 34, 30, 7);
+    g.fill();
+    g.stroke();
+    g.fillStyle = '#4a3208';
+    g.beginPath();
+    g.arc(cx, bodyY + 33, 5, 0, Math.PI * 2);
+    g.fill();
+    g.fillRect(cx - 2.5, bodyY + 33, 5, 9);
+
+    g.save();
+    g.translate(cx, bodyY);
+    g.translate(0, -34 * lidLift);
+    g.rotate(-0.3 * lidLift);
+    g.translate(-cx, -bodyY);
+
+    const lidGrad = g.createLinearGradient(0, lidY, 0, lidY + lidH);
+    lidGrad.addColorStop(0, '#a06a32');
+    lidGrad.addColorStop(1, '#6b431e');
+    g.fillStyle = lidGrad;
+    g.strokeStyle = '#3a2410';
+    g.lineWidth = 3;
+    g.beginPath();
+    g.moveTo(lidX, lidY + lidH);
+    g.lineTo(lidX, lidY + 22);
+    g.quadraticCurveTo(lidX + 6, lidY, lidX + bodyW / 2, lidY);
+    g.quadraticCurveTo(lidX + bodyW - 6, lidY, lidX + bodyW, lidY + 22);
+    g.lineTo(lidX + bodyW, lidY + lidH);
+    g.closePath();
+    g.fill();
+    g.stroke();
+
+    g.fillStyle = '#c9a227';
+    g.fillRect(lidX + 22, lidY + lidH - 13, bodyW - 44, 13);
+    g.fillStyle = 'rgba(255,255,255,0.22)';
+    g.fillRect(lidX + 22, lidY + lidH - 13, bodyW - 44, 4);
+
+    drawOuroboros(g, lidX + bodyW / 2, lidY + lidH / 2 - 1, 17, t, glow);
+    g.restore();
+}
+
+function drawChestReveal(t) {
+    if (chestState !== 'opened') return;
+    const prevCtx = ctx;
+    const prevTile = tileSize;
+    const prevCount = tileCount;
+
+    ctx = chestCanvasEl.getContext('2d');
+    tileSize = 34;
+    tileCount = 50;
+
+    const skin = { hue: playerSkin.hue, pattern: playerSkin.pattern, hat: playerSkin.hat };
+    if (pendingItem) {
+        if (pendingItem.type === 'hue') skin.hue = pendingItem.id;
+        else if (pendingItem.type === 'pattern') skin.pattern = pendingItem.id;
+        else if (pendingItem.type === 'hat') skin.hat = pendingItem.id;
+    }
+
+    ctx.save();
+    ctx.translate(52, 2);
+    drawSnakeSet([
+        { x: 3, y: 1 },
+        { x: 2, y: 1 },
+        { x: 1, y: 1 }
+    ], 1, 0, skin, t);
+    ctx.restore();
+
+    ctx = prevCtx;
+    tileSize = prevTile;
+    tileCount = prevCount;
+}
 
 function drawWardrobePreview(t) {
     const prevCtx = ctx;
