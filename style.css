@@ -241,7 +241,7 @@ body {
 }
 
 @media (max-height: 640px) {
-    .loser {
+    #resultTitle {
         font-size: clamp(44px, 13vh, 96px);
     }
 
@@ -481,7 +481,8 @@ body {
 
 /* ---------- auth ---------- */
 
-#panel-auth {
+#panel-auth,
+#panel-mp {
     flex-direction: column;
     justify-content: center;
     gap: clamp(4px, 1vw, 8px);
@@ -583,4 +584,44 @@ body {
     color: #fbbf24 !important;
     min-height: 1.2em;
     text-align: center;
+}
+
+/* ---------- multiplayer ---------- */
+
+.chip.foe {
+    color: #7dd3fc;
+    border-color: rgba(56, 189, 248, 0.4);
+    background: rgba(56, 189, 248, 0.1);
+}
+
+#resultTitle {
+    font-size: clamp(52px, 16vw, 190px);
+    line-height: 0.9;
+    font-weight: 900;
+    letter-spacing: clamp(2px, 1vw, 10px);
+    animation: loserPulse 1.4s ease-in-out infinite;
+}
+
+#resultTitle.winner {
+    background: linear-gradient(180deg, #bbf7d0 0%, #4ade80 45%, #166534 100%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+    filter: drop-shadow(0 0 40px rgba(74, 222, 128, 0.55)) drop-shadow(0 8px 20px rgba(0, 0, 0, 0.7));
+}
+
+#resultTitle.draw {
+    background: linear-gradient(180deg, #fde68a 0%, #fbbf24 45%, #92400e 100%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+    filter: drop-shadow(0 0 40px rgba(251, 191, 36, 0.5)) drop-shadow(0 8px 20px rgba(0, 0, 0, 0.7));
+}
+
+#roomInput.code {
+    flex: 0 1 120px;
+    text-transform: uppercase;
+    letter-spacing: 4px;
+    font-weight: 800;
+    font-size: clamp(14px, 2.8vw, 18px);
 }

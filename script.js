@@ -26,6 +26,18 @@ const authSignupBtn = document.getElementById('authSignupBtn');
 const authLogoutBtn = document.getElementById('authLogoutBtn');
 const authWhoEl = document.getElementById('authWho');
 const authStatusEl = document.getElementById('authStatus');
+const foeChipEl = document.getElementById('foeChip');
+const foeScoreEl = document.getElementById('foeScore');
+const resultTitleEl = document.getElementById('resultTitle');
+const soloResultEl = document.getElementById('soloResult');
+const mpResultEl = document.getElementById('mpResult');
+const mpScoreYouEl = document.getElementById('mpScoreYou');
+const mpScoreFoeEl = document.getElementById('mpScoreFoe');
+const roomInputEl = document.getElementById('roomInput');
+const createRoomBtn = document.getElementById('createRoomBtn');
+const joinRoomBtn = document.getElementById('joinRoomBtn');
+const leaveRoomBtn = document.getElementById('leaveRoomBtn');
+const roomStatusEl = document.getElementById('roomStatus');
 
 const INITIAL_SPEED = 150;
 const SPEED_INCREASE = 1.5;
@@ -45,6 +57,26 @@ let nextVelocityX = 1;
 let nextVelocityY = 0;
 let score = 0;
 let isSubmitted = false;
+let lastScoreValue = 0;
+
+/* multiplayer */
+let mode = 'solo';
+let role = null;
+let roomCode = '';
+let channel = null;
+let mpSelf = [];
+let mpOther = [];
+let mpSelfVel = { x: 1, y: 0 };
+let mpOtherVel = { x: -1, y: 0 };
+let mpOtherNext = { x: -1, y: 0 };
+let mpCountdown = 0;
+let mpOver = false;
+let mpWinner = 0;
+let mpScores = [0, 0];
+let mpOpponentOnline = false;
+let mpOverlayShown = false;
+let mpJoinTimer = null;
+let mpHostGoneTimer = null;
 let highScore = parseInt(localStorage.getItem('snakeHighScore')) || 0;
 let speed = INITIAL_SPEED;
 
@@ -60,9 +92,9 @@ tabs.forEach(tab => {
         const panel = document.getElementById('panel-' + tab.dataset.panel);
         panel.classList.add('active');
 
-        const isLeaders = tab.dataset.panel === 'leaders';
-        const isAuth = tab.dataset.panel === 'auth';
-        panelsEl.classList.toggle('tall', isLeaders || isAuth);
+        const id = tab.dataset.panel;
+        const isLeaders = id === 'leaders';
+        panelsEl.classList.toggle('tall', isLeaders || id === 'auth' || id === 'mp');
         if (isLeaders) refreshLeaders();
         setTimeout(resizeCanvas, 0);
     });
@@ -95,20 +127,30 @@ document.addEventListener('fullscreenchange', updateFullscreenIcons);
 
 /* ---------------- sizing ---------------- */
 
-function resizeCanvas() {
+function availMinDim() {
     const cs = getComputedStyle(stage);
     const availW = stage.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight);
     const availH = stage.clientHeight - parseFloat(cs.paddingTop) - parseFloat(cs.paddingBottom);
-    const minDim = Math.max(160, Math.min(availW, availH));
+    return Math.max(160, Math.min(availW, availH));
+}
 
-    tileCount = Math.max(12, Math.min(40, Math.round(minDim / 26)));
+function fitCanvasTo(minDim) {
     tileSize = Math.max(10, Math.floor(minDim / tileCount));
-
     const size = tileSize * tileCount;
     canvas.width = size;
     canvas.height = size;
     canvas.style.width = size + 'px';
     canvas.style.height = size + 'px';
+}
+
+function resizeCanvas() {
+    const minDim = availMinDim();
+    const inMpRound = mode === 'mp' && mpSelf.length > 0;
+
+    if (!inMpRound) {
+        tileCount = Math.max(12, Math.min(40, Math.round(minDim / 26)));
+    }
+    fitCanvasTo(minDim);
 
     snake.forEach(s => {
         s.x = ((s.x % tileCount) + tileCount) % tileCount;
@@ -116,6 +158,13 @@ function resizeCanvas() {
     });
     food.x = ((food.x % tileCount) + tileCount) % tileCount;
     food.y = ((food.y % tileCount) + tileCount) % tileCount;
+}
+
+// гость подстраивает сетку под хоста
+function applyTileCount(tc) {
+    if (tc === tileCount) return;
+    tileCount = tc;
+    fitCanvasTo(availMinDim());
 }
 
 /* ---------------- fruits ---------------- */
@@ -134,11 +183,18 @@ function placeFood() {
     food.type = Math.floor(Math.random() * FRUITS.length);
 }
 
-function isOnSnake(x, y) {
-    for (let i = 0; i < snake.length; i++) {
-        if (snake[i].x === x && snake[i].y === y) return true;
+function isInList(list, x, y) {
+    for (let i = 0; i < list.length; i++) {
+        if (list[i].x === x && list[i].y === y) return true;
     }
     return false;
+}
+
+function isOnSnake(x, y) {
+    if (mode === 'mp') {
+        return isInList(mpSelf, x, y) || isInList(mpOther, x, y);
+    }
+    return isInList(snake, x, y);
 }
 
 /* ---------------- game flow ---------------- */
@@ -166,6 +222,7 @@ function initGame() {
     isPaused = false;
     gameOverEl.classList.add('hidden');
     pauseEl.classList.add('hidden');
+    foeChipEl.classList.add('hidden');
 
     placeFood();
     clearInterval(gameLoopId);
@@ -174,6 +231,11 @@ function initGame() {
 
 function gameLoop() {
     if (isPaused || isGameOver) return;
+
+    if (mode === 'mp') {
+        mpHostTick();
+        return;
+    }
 
     velocityX = nextVelocityX;
     velocityY = nextVelocityY;
@@ -220,25 +282,43 @@ function gameLoop() {
 
 function gameOver() {
     isGameOver = true;
+    lastScoreValue = score;
     finalScoreEl.textContent = score;
     isSubmitted = false;
     saveStatusEl.textContent = '';
     saveScoreBtn.disabled = false;
     playerNameEl.value = localStorage.getItem('snakeName') || '';
-    gameOverEl.classList.remove('hidden');
+    foeChipEl.classList.add('hidden');
+    showResultOverlay('solo');
     clearInterval(gameLoopId);
     refreshLeaders();
 }
 
 function togglePause() {
-    if (isGameOver) return;
+    if (isGameOver || mode === 'mp') return;
     isPaused = !isPaused;
     pauseEl.classList.toggle('hidden', !isPaused);
 }
 
 function changeDirection(x, y) {
     if (isGameOver) return;
-    if (x === -velocityX && y === -velocityY) return;
+
+    if (mode === 'mp') {
+        if (role === 'guest') {
+            mpSend('dir', [x, y]);
+            return;
+        }
+        if (x === -velocityX && y === -velocityY) return;
+        if (x === -nextVelocityX && y === -nextVelocityY) return;
+        nextVelocityX = x;
+        nextVelocityY = y;
+        return;
+    }
+
+    if (x === -velocityX && y === -velocityY) {
+        return;
+    }
+
     nextVelocityX = x;
     nextVelocityY = y;
 }
@@ -625,10 +705,11 @@ function drawFood(t) {
 
 /* ---------------- snake ---------------- */
 
-function drawConnector(x1, y1, x2, y2, tint) {
-    const dark = `hsl(145, 55%, ${Math.max(22, 34 - tint * 0.12)}%)`;
-    const mid = `hsl(145, 60%, ${Math.max(32, 46 - tint * 0.18)}%)`;
-    const light = `hsl(145, 65%, ${Math.max(40, 58 - tint * 0.2)}%)`;
+function drawConnector(x1, y1, x2, y2, tint, hue) {
+    hue = hue === undefined ? 145 : hue;
+    const dark = `hsl(${hue}, 55%, ${Math.max(22, 34 - tint * 0.12)}%)`;
+    const mid = `hsl(${hue}, 60%, ${Math.max(32, 46 - tint * 0.18)}%)`;
+    const light = `hsl(${hue}, 65%, ${Math.max(40, 58 - tint * 0.2)}%)`;
 
     ctx.lineCap = 'round';
 
@@ -657,7 +738,8 @@ function drawConnector(x1, y1, x2, y2, tint) {
     ctx.restore();
 }
 
-function drawSegment(px, py, index, t) {
+function drawSegment(px, py, index, t, vx, vy, hue) {
+    hue = hue === undefined ? 145 : hue;
     const cx = px * tileSize + tileSize / 2;
     const cy = py * tileSize + tileSize / 2;
     const r = tileSize * 0.46;
@@ -671,13 +753,13 @@ function drawSegment(px, py, index, t) {
 
     const g = ctx.createRadialGradient(cx - r * 0.4, cy - r * 0.45, r * 0.1, cx, cy, r * 1.15);
     if (isHead) {
-        g.addColorStop(0, '#d9fbe4');
-        g.addColorStop(0.35, `hsl(145, 70%, ${lightness + 8}%)`);
-        g.addColorStop(1, `hsl(150, 65%, ${lightness - 22}%)`);
+        g.addColorStop(0, `hsl(${hue}, 60%, 90%)`);
+        g.addColorStop(0.35, `hsl(${hue}, 70%, ${lightness + 8}%)`);
+        g.addColorStop(1, `hsl(${hue + 5}, 65%, ${lightness - 22}%)`);
     } else {
-        g.addColorStop(0, `hsl(145, 65%, ${lightness + 12}%)`);
-        g.addColorStop(0.4, `hsl(145, 60%, ${lightness}%)`);
-        g.addColorStop(1, `hsl(150, 60%, ${lightness - 24}%)`);
+        g.addColorStop(0, `hsl(${hue}, 65%, ${lightness + 12}%)`);
+        g.addColorStop(0.4, `hsl(${hue}, 60%, ${lightness}%)`);
+        g.addColorStop(1, `hsl(${hue + 5}, 60%, ${lightness - 24}%)`);
     }
 
     ctx.fillStyle = g;
@@ -709,12 +791,13 @@ function drawSegment(px, py, index, t) {
     ctx.fill();
 
     if (isHead) {
-        drawHeadFace(cx, cy, r, t);
+        drawHeadFace(cx, cy, r, t, vx, vy);
     }
 }
 
-function drawHeadFace(cx, cy, r, t) {
-    let fx = velocityX, fy = velocityY;
+function drawHeadFace(cx, cy, r, t, vx, vy) {
+    let fx = vx === undefined ? velocityX : vx;
+    let fy = vy === undefined ? velocityY : vy;
     if (fx === 0 && fy === 0) { fx = 1; fy = 0; }
     const rx = -fy, ry = fx;
 
@@ -764,11 +847,12 @@ function drawHeadFace(cx, cy, r, t) {
     }
 }
 
-function drawSnake(t) {
-    // соединяющие звенья
-    for (let i = 0; i < snake.length - 1; i++) {
-        const a = snake[i];
-        const b = snake[i + 1];
+function drawSnakeSet(segments, vx, vy, hue, t) {
+    if (!segments || segments.length === 0) return;
+
+    for (let i = 0; i < segments.length - 1; i++) {
+        const a = segments[i];
+        const b = segments[i + 1];
         const d = torusDelta(a, b);
         if (d.dx === 0 && d.dy === 0) continue;
         const ax = a.x * tileSize + tileSize / 2;
@@ -781,21 +865,46 @@ function drawSnake(t) {
             const py = p.y * tileSize + tileSize / 2;
             const ox = px - ax;
             const oy = py - ay;
-            drawConnector(px, py, bx + ox, by + oy, i);
+            drawConnector(px, py, bx + ox, by + oy, i, hue);
         });
     }
 
-    // сегменты
-    for (let i = snake.length - 1; i >= 0; i--) {
-        const s = snake[i];
-        wrappedCopies(s).forEach(p => drawSegment(p.x, p.y, i, t));
+    for (let i = segments.length - 1; i >= 0; i--) {
+        const s = segments[i];
+        wrappedCopies(s).forEach(p => drawSegment(p.x, p.y, i, t, vx, vy, hue));
     }
+}
+
+function drawSnake(t) {
+    drawSnakeSet(snake, velocityX, velocityY, 145, t);
+}
+
+function drawCountdown() {
+    const text = String(mpCountdown);
+    ctx.save();
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.font = `900 ${Math.floor(tileSize * 3)}px system-ui, sans-serif`;
+    ctx.fillStyle = 'rgba(0,0,0,0.45)';
+    ctx.beginPath();
+    ctx.arc(canvas.width / 2, canvas.height / 2, tileSize * 2.4, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = '#fbbf24';
+    ctx.fillText(text, canvas.width / 2, canvas.height / 2);
+    ctx.restore();
 }
 
 function draw(t) {
     drawBackground();
     drawFood(t);
-    drawSnake(t);
+
+    if (mode === 'mp') {
+        drawSnakeSet(mpOther, mpOtherVel.x, mpOtherVel.y, 205, t);
+        drawSnakeSet(mpSelf, mpSelfVel.x, mpSelfVel.y, 145, t);
+        if (mpCountdown > 0) drawCountdown();
+    } else {
+        drawSnake(t);
+    }
 }
 
 function renderFrame(now) {
@@ -835,7 +944,7 @@ document.addEventListener('keydown', (e) => {
         e.preventDefault();
         togglePause();
     } else if (isEnter) {
-        if (isGameOver) initGame();
+        if (isGameOver) handleRestart();
     }
 });
 
@@ -884,7 +993,409 @@ canvas.addEventListener('touchend', (e) => {
     e.preventDefault();
 }, { passive: false });
 
-restartBtn.addEventListener('click', initGame);
+/* ---------------- multiplayer ---------------- */
+
+const MP_TICK = 110;
+const MP_COUNTDOWN_TICKS = Math.round(3000 / MP_TICK);
+const ROOM_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+const clientId = Math.random().toString(36).slice(2, 10);
+let mpStateSeen = false;
+
+function mpStatus(text) {
+    roomStatusEl.textContent = text;
+}
+
+function mpRandomCode() {
+    let code = '';
+    for (let i = 0; i < 4; i++) {
+        code += ROOM_ALPHABET[Math.floor(Math.random() * ROOM_ALPHABET.length)];
+    }
+    return code;
+}
+
+function mpSend(event, payload) {
+    if (!channel) return;
+    channel.send({ type: 'broadcast', event: event, payload: payload });
+}
+
+function mpMyIndex() {
+    return role === 'host' ? 0 : 1;
+}
+
+function wrapCell(x, y) {
+    if (x < 0) x = tileCount - 1;
+    else if (x >= tileCount) x = 0;
+    if (y < 0) y = tileCount - 1;
+    else if (y >= tileCount) y = 0;
+    return { x: x, y: y };
+}
+
+function mpUpdateHud() {
+    const my = mpMyIndex();
+    scoreEl.textContent = mpScores[my];
+    foeScoreEl.textContent = mpScores[1 - my];
+    foeChipEl.classList.remove('hidden');
+}
+
+function roomUi(inRoom) {
+    createRoomBtn.classList.toggle('hidden', inRoom);
+    joinRoomBtn.classList.toggle('hidden', inRoom);
+    roomInputEl.classList.toggle('hidden', inRoom);
+    leaveRoomBtn.classList.toggle('hidden', !inRoom);
+}
+
+function showResultOverlay(kind) {
+    isGameOver = true;
+    resultTitleEl.classList.remove('loser', 'winner', 'draw');
+    if (kind === 'win') {
+        resultTitleEl.textContent = 'WINNER!';
+        resultTitleEl.classList.add('winner');
+    } else if (kind === 'draw') {
+        resultTitleEl.textContent = 'НИЧЬЯ';
+        resultTitleEl.classList.add('draw');
+    } else {
+        resultTitleEl.textContent = 'LOSER';
+        resultTitleEl.classList.add('loser');
+    }
+
+    const solo = kind === 'solo';
+    soloResultEl.classList.toggle('hidden', !solo);
+    mpResultEl.classList.toggle('hidden', solo);
+
+    if (!solo) {
+        const my = mpMyIndex();
+        lastScoreValue = mpScores[my];
+        mpScoreYouEl.textContent = mpScores[my];
+        mpScoreFoeEl.textContent = mpScores[1 - my];
+        isSubmitted = false;
+        saveScoreBtn.disabled = false;
+        saveStatusEl.textContent = '';
+    }
+
+    gameOverEl.classList.remove('hidden');
+}
+
+function hideResultOverlay() {
+    isGameOver = false;
+    mpOverlayShown = false;
+    gameOverEl.classList.add('hidden');
+    pauseEl.classList.add('hidden');
+    isPaused = false;
+}
+
+function mpStartRound() {
+    const midY = Math.floor(tileCount / 2);
+    const sx = Math.max(4, Math.floor(tileCount * 0.3));
+    const ox = Math.min(tileCount - 5, Math.floor(tileCount * 0.7));
+
+    mpSelf = [
+        { x: sx, y: midY },
+        { x: sx - 1, y: midY },
+        { x: sx - 2, y: midY }
+    ];
+    mpOther = [
+        { x: ox, y: midY },
+        { x: ox + 1, y: midY },
+        { x: ox + 2, y: midY }
+    ];
+
+    velocityX = 1;
+    velocityY = 0;
+    nextVelocityX = 1;
+    nextVelocityY = 0;
+    mpSelfVel = { x: 1, y: 0 };
+    mpOtherVel = { x: -1, y: 0 };
+    mpOtherNext = { x: -1, y: 0 };
+    mpScores = [0, 0];
+    mpOver = false;
+    mpWinner = 0;
+    mpCountdown = MP_COUNTDOWN_TICKS;
+    mpOverlayShown = false;
+    isGameOver = false;
+    isPaused = false;
+    mode = 'mp';
+
+    gameOverEl.classList.add('hidden');
+    pauseEl.classList.add('hidden');
+
+    placeFood();
+    mpUpdateHud();
+    mpStatus('Код: ' + roomCode + ' — раунд начинается!');
+
+    clearInterval(gameLoopId);
+    gameLoopId = setInterval(gameLoop, MP_TICK);
+}
+
+function mpBroadcast() {
+    mpSend('state', {
+        tc: tileCount,
+        c: mpCountdown,
+        s1: mpSelf.map(p => [p.x, p.y]),
+        s2: mpOther.map(p => [p.x, p.y]),
+        v1: [mpSelfVel.x, mpSelfVel.y],
+        v2: [mpOtherVel.x, mpOtherVel.y],
+        f: [food.x, food.y, food.type],
+        sc: mpScores.slice(),
+        over: mpOver,
+        w: mpWinner
+    });
+}
+
+function mpHostTick() {
+    if (role !== 'host' || mpOver || !mpSelf.length) return;
+
+    if (mpCountdown > 0) {
+        mpCountdown--;
+        mpBroadcast();
+        return;
+    }
+
+    velocityX = nextVelocityX;
+    velocityY = nextVelocityY;
+    mpSelfVel = { x: velocityX, y: velocityY };
+    mpOtherVel = { x: mpOtherNext.x, y: mpOtherNext.y };
+
+    const h1 = wrapCell(mpSelf[0].x + velocityX, mpSelf[0].y + velocityY);
+    const h2 = wrapCell(mpOther[0].x + mpOtherVel.x, mpOther[0].y + mpOtherVel.y);
+
+    mpSelf.unshift(h1);
+    mpOther.unshift(h2);
+
+    const eat1 = h1.x === food.x && h1.y === food.y;
+    const eat2 = h2.x === food.x && h2.y === food.y;
+
+    const selfHit = isInList(mpSelf.slice(1), h1.x, h1.y);
+    const otherSelfHit = isInList(mpOther.slice(1), h2.x, h2.y);
+    const cross1 = isInList(mpOther, h1.x, h1.y);
+    const cross2 = isInList(mpSelf, h2.x, h2.y);
+
+    const alive1 = !selfHit && !cross1;
+    const alive2 = !otherSelfHit && !cross2;
+
+    if (!eat1) mpSelf.pop();
+    if (!eat2) mpOther.pop();
+
+    if (alive1 && eat1) mpScores[0]++;
+    if (alive2 && eat2) mpScores[1]++;
+    if ((alive1 && eat1) || (alive2 && eat2)) placeFood();
+
+    if (!alive1 || !alive2) {
+        mpOver = true;
+        mpWinner = alive1 && !alive2 ? 1 : (!alive1 && alive2 ? 2 : 0);
+        mpUpdateHud();
+        showResultOverlay(mpWinner === 1 ? 'win' : mpWinner === 2 ? 'lose' : 'draw');
+        mpBroadcast();
+        return;
+    }
+
+    mpUpdateHud();
+    mpBroadcast();
+}
+
+function onMpState(st) {
+    if (role !== 'guest') return;
+
+    if (st.tc) applyTileCount(st.tc);
+
+    mpSelf = st.s2.map(a => ({ x: a[0], y: a[1] }));
+    mpOther = st.s1.map(a => ({ x: a[0], y: a[1] }));
+    mpSelfVel = { x: st.v2[0], y: st.v2[1] };
+    mpOtherVel = { x: st.v1[0], y: st.v1[1] };
+    food = { x: st.f[0], y: st.f[1], type: st.f[2] };
+    mpScores = st.sc.slice();
+    mpCountdown = st.c;
+    mpOver = st.over;
+    mpWinner = st.w;
+
+    mpUpdateHud();
+
+    if (st.over) {
+        if (!mpOverlayShown) {
+            mpOverlayShown = true;
+            const iWon = (st.w === 1 && role === 'host') || (st.w === 2 && role === 'guest');
+            showResultOverlay(st.w === 0 ? 'draw' : (iWon ? 'win' : 'lose'));
+        }
+        return;
+    }
+
+    if (!gameOverEl.classList.contains('hidden')) hideResultOverlay();
+
+    if (st.c > 0) {
+        mpStatus('Отсчёт…');
+    } else {
+        mpStatus('Бой идёт! Код: ' + roomCode);
+    }
+}
+
+function onMpDir(p) {
+    if (role !== 'host' || !p) return;
+    const dx = p[0];
+    const dy = p[1];
+    if (Math.abs(dx) + Math.abs(dy) !== 1) return;
+    if (dx === -mpOtherVel.x && dy === -mpOtherVel.y) return;
+    if (dx === -mpOtherNext.x && dy === -mpOtherNext.y) return;
+    mpOtherNext = { x: dx, y: dy };
+}
+
+function onMpPresence() {
+    if (!channel) return;
+
+    const count = Object.keys(channel.presenceState()).length;
+
+    if (role === 'guest') {
+        if (count < 2 && mpStateSeen) {
+            if (!mpHostGoneTimer) {
+                mpHostGoneTimer = setTimeout(() => {
+                    mpHostGoneTimer = null;
+                    if (channel && mpStateSeen && Object.keys(channel.presenceState()).length < 2) {
+                        leaveRoom();
+                        mpStatus('Соперник вышел — игра окончена');
+                    }
+                }, 1500);
+            }
+        } else if (mpHostGoneTimer) {
+            clearTimeout(mpHostGoneTimer);
+            mpHostGoneTimer = null;
+        }
+        return;
+    }
+
+    if (role !== 'host') return;
+
+    if (count >= 2) {
+        if (!mpOpponentOnline) {
+            mpOpponentOnline = true;
+            mpStatus('Соперник найден! Код: ' + roomCode);
+            mpStartRound();
+        }
+        return;
+    }
+
+    if (mpOpponentOnline) {
+        mpOpponentOnline = false;
+        mpStatus('Соперник вышел. Ждём нового… Код: ' + roomCode);
+        if (!mpOver) {
+            mpOver = true;
+            mpWinner = 1;
+            mpUpdateHud();
+            showResultOverlay('win');
+            mpBroadcast();
+        }
+    }
+}
+
+function connectRoom(code, asHost) {
+    if (!db) {
+        mpStatus('Нужны ключи Supabase в supabase-config.js');
+        return;
+    }
+
+    leaveRoom(true);
+
+    mode = 'mp';
+    role = asHost ? 'host' : 'guest';
+    roomCode = code;
+    mpStateSeen = false;
+    mpOver = false;
+    isGameOver = false;
+    gameOverEl.classList.add('hidden');
+    roomUi(true);
+
+    channel = db.channel('snake-room-' + code, {
+        config: { presence: { key: clientId }, broadcast: { self: false } }
+    });
+
+    channel.on('broadcast', { event: 'state' }, (msg) => {
+        mpStateSeen = true;
+        onMpState(msg.payload);
+    });
+    channel.on('broadcast', { event: 'dir' }, (msg) => onMpDir(msg.payload));
+    channel.on('broadcast', { event: 'again' }, () => {
+        if (role === 'host' && mpOver) mpStartRound();
+    });
+    channel.on('presence', { event: 'sync' }, onMpPresence);
+
+    channel.subscribe((status) => {
+        if (status === 'SUBSCRIBED') {
+            channel.track({ role: role, id: clientId });
+            if (role === 'host') {
+                mpStatus('Код: ' + code + ' — ждём соперника…');
+            } else {
+                mpStatus('Подключение…');
+                clearTimeout(mpJoinTimer);
+                mpJoinTimer = setTimeout(() => {
+                    if (!mpStateSeen) {
+                        leaveRoom();
+                        mpStatus('Комната не найдена');
+                    }
+                }, 4000);
+            }
+        } else if (status === 'CHANNEL_ERROR') {
+            mpStatus('Ошибка подключения к Realtime');
+        }
+    });
+}
+
+function leaveRoom(silent) {
+    clearTimeout(mpJoinTimer);
+    clearTimeout(mpHostGoneTimer);
+    mpHostGoneTimer = null;
+    if (channel) {
+        try { channel.unsubscribe(); } catch (e) { console.warn(e.message); }
+        channel = null;
+    }
+
+    const wasMp = mode === 'mp';
+    mode = 'solo';
+    role = null;
+    roomCode = '';
+    mpOpponentOnline = false;
+    mpStateSeen = false;
+    mpSelf = [];
+    mpOther = [];
+    mpOver = false;
+    mpCountdown = 0;
+    mpOverlayShown = false;
+    foeChipEl.classList.add('hidden');
+    roomUi(false);
+
+    if (!silent && wasMp) {
+        initGame();
+        mpStatus('Создай комнату или введи код друга');
+    }
+}
+
+function handleRestart() {
+    if (mode === 'mp') {
+        if (role === 'host') {
+            mpStartRound();
+        } else {
+            mpSend('again', {});
+            mpStatus('Ждём соперника…');
+        }
+        return;
+    }
+    initGame();
+}
+
+createRoomBtn.addEventListener('click', () => {
+    const code = mpRandomCode();
+    roomInputEl.value = code;
+    connectRoom(code, true);
+});
+
+joinRoomBtn.addEventListener('click', () => {
+    const code = (roomInputEl.value || '').trim().toUpperCase();
+    if (!/^[A-Z0-9]{4}$/.test(code)) {
+        mpStatus('Код — 4 символа: буквы и цифры');
+        return;
+    }
+    connectRoom(code, false);
+});
+
+leaveRoomBtn.addEventListener('click', () => leaveRoom());
+
+restartBtn.addEventListener('click', handleRestart);
 
 let resizeTimer;
 window.addEventListener('resize', () => {
@@ -1006,7 +1517,7 @@ saveScoreBtn.addEventListener('click', async () => {
     saveScoreBtn.disabled = true;
     saveStatusEl.textContent = 'Отправка…';
 
-    const ok = await submitScore(name, score);
+    const ok = await submitScore(name, lastScoreValue);
     isSubmitted = ok;
     saveStatusEl.textContent = ok ? 'Результат сохранён!' : 'Нет связи — попробуй ещё раз';
     saveScoreBtn.disabled = ok;

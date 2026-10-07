@@ -17,6 +17,7 @@
                 <button class="tab" data-panel="pad">Кнопки</button>
                 <button class="tab" data-panel="leaders">Лидеры</button>
                 <button class="tab" data-panel="auth">Вход</button>
+                <button class="tab" data-panel="mp">Мультиплеер</button>
             </nav>
 
             <button id="fullscreenBtn" title="Полный экран (F11)">
@@ -50,6 +51,7 @@
             <div class="panel active" id="panel-score">
                 <div class="chip score">Счёт: <span id="score">0</span></div>
                 <div class="chip high-score">Лучший: <span id="highScore">0</span></div>
+                <div class="chip foe hidden" id="foeChip">Соперник: <span id="foeScore">0</span></div>
             </div>
 
             <div class="panel" id="panel-controls">
@@ -86,14 +88,26 @@
 
                 <p id="authStatus" class="auth-status"></p>
             </div>
+
+            <div class="panel" id="panel-mp">
+                <div class="auth-box">
+                    <input id="roomInput" class="code" type="text" maxlength="4" placeholder="КОД"
+                           autocomplete="off" autocapitalize="characters">
+                    <button id="createRoomBtn">Создать комнату</button>
+                    <button id="joinRoomBtn" class="ghost">Войти по коду</button>
+                    <button id="leaveRoomBtn" class="ghost hidden">Покинуть</button>
+                </div>
+                <p id="roomStatus" class="auth-status">Создай комнату или введи код друга</p>
+            </div>
         </div>
 
         <div class="stage">
             <canvas id="gameCanvas"></canvas>
 
             <div id="gameOver" class="overlay hidden">
-                <h1 class="loser">LOSER</h1>
-                <p>Твой счёт: <span id="finalScore">0</span></p>
+                <h1 class="loser" id="resultTitle">LOSER</h1>
+                <p id="soloResult">Твой счёт: <span id="finalScore">0</span></p>
+                <p id="mpResult" class="hidden">Ты: <span id="mpScoreYou">0</span> • Соперник: <span id="mpScoreFoe">0</span></p>
                 <div class="save-row">
                     <input id="playerName" type="text" maxlength="16" placeholder="Твоё имя" autocomplete="off">
                     <button id="saveScoreBtn">В таблицу лидеров</button>
