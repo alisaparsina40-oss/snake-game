@@ -16,6 +16,7 @@
                 <button class="tab" data-panel="controls">Управление</button>
                 <button class="tab" data-panel="pad">Кнопки</button>
                 <button class="tab" data-panel="leaders">Лидеры</button>
+                <button class="tab" data-panel="auth">Вход</button>
             </nav>
 
             <button id="fullscreenBtn" title="Полный экран (F11)">
@@ -68,6 +69,22 @@
                 <ol id="leadersList" class="leaders-list">
                     <li class="leaders-empty">Загрузка…</li>
                 </ol>
+            </div>
+
+            <div class="panel" id="panel-auth">
+                <div class="auth-box" id="authGuest">
+                    <input id="authEmail" type="email" placeholder="e-mail" autocomplete="email">
+                    <input id="authPass" type="password" placeholder="пароль" autocomplete="current-password">
+                    <button id="authLoginBtn">Войти</button>
+                    <button id="authSignupBtn" class="ghost">Создать аккаунт</button>
+                </div>
+
+                <div class="auth-box hidden" id="authUserBox">
+                    <span id="authWho">—</span>
+                    <button id="authLogoutBtn" class="ghost">Выйти</button>
+                </div>
+
+                <p id="authStatus" class="auth-status"></p>
             </div>
         </div>
 

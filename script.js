@@ -17,6 +17,15 @@ const leadersListEl = document.getElementById('leadersList');
 const playerNameEl = document.getElementById('playerName');
 const saveScoreBtn = document.getElementById('saveScoreBtn');
 const saveStatusEl = document.getElementById('saveStatus');
+const authGuestBox = document.getElementById('authGuest');
+const authUserBox = document.getElementById('authUserBox');
+const authEmailEl = document.getElementById('authEmail');
+const authPassEl = document.getElementById('authPass');
+const authLoginBtn = document.getElementById('authLoginBtn');
+const authSignupBtn = document.getElementById('authSignupBtn');
+const authLogoutBtn = document.getElementById('authLogoutBtn');
+const authWhoEl = document.getElementById('authWho');
+const authStatusEl = document.getElementById('authStatus');
 
 const INITIAL_SPEED = 150;
 const SPEED_INCREASE = 1.5;
@@ -52,7 +61,8 @@ tabs.forEach(tab => {
         panel.classList.add('active');
 
         const isLeaders = tab.dataset.panel === 'leaders';
-        panelsEl.classList.toggle('tall', isLeaders);
+        const isAuth = tab.dataset.panel === 'auth';
+        panelsEl.classList.toggle('tall', isLeaders || isAuth);
         if (isLeaders) refreshLeaders();
         setTimeout(resizeCanvas, 0);
     });
@@ -1001,6 +1011,7 @@ saveScoreBtn.addEventListener('click', async () => {
     saveStatusEl.textContent = ok ? 'Результат сохранён!' : 'Нет связи — попробуй ещё раз';
     saveScoreBtn.disabled = ok;
 
+    if (ok) syncNameToProfile();
     refreshLeaders();
 });
 
@@ -1011,7 +1022,142 @@ playerNameEl.addEventListener('keydown', (e) => {
     }
 });
 
+let authUser = null;
+
+function authProfileName() {
+    const meta = authUser && authUser.user_metadata;
+    return (meta && meta.name ? String(meta.name) : '').trim();
+}
+
+function renderAuth() {
+    const loggedIn = !!authUser;
+    authGuestBox.classList.toggle('hidden', loggedIn);
+    authUserBox.classList.toggle('hidden', !loggedIn);
+
+    if (loggedIn) {
+        authWhoEl.textContent = 'Ты: ' + (authUser.email || '');
+        const n = authProfileName();
+        if (n) playerNameEl.value = n;
+    }
+
+    saveScoreBtn.textContent = loggedIn ? 'Сохранить результат' : 'В таблицу лидеров';
+}
+
+async function syncNameToProfile() {
+    if (!db || !authUser) return;
+    const name = (playerNameEl.value || '').trim().slice(0, 16);
+    if (!name || name === authProfileName()) return;
+    try {
+        await db.auth.updateUser({ data: { name: name } });
+    } catch (e) {
+        console.warn('Не удалось сохранить имя профиля:', e.message);
+    }
+}
+
+async function initAuth() {
+    if (!db) {
+        authStatusEl.textContent = 'Авторизация недоступна — не вставлены ключи Supabase';
+        renderAuth();
+        return;
+    }
+
+    try {
+        const { data } = await db.auth.getSession();
+        authUser = data.session ? data.session.user : null;
+    } catch (e) {
+        authUser = null;
+    }
+    renderAuth();
+
+    db.auth.onAuthStateChange((event, session) => {
+        authUser = session ? session.user : null;
+        renderAuth();
+        if (event === 'SIGNED_IN') refreshLeaders();
+    });
+}
+
+authLoginBtn.addEventListener('click', async () => {
+    if (!db) return;
+    const email = authEmailEl.value.trim();
+    const pass = authPassEl.value;
+    if (!email || !pass) {
+        authStatusEl.textContent = 'Введи e-mail и пароль';
+        return;
+    }
+
+    authStatusEl.textContent = 'Вход…';
+    authLoginBtn.disabled = true;
+    authSignupBtn.disabled = true;
+
+    const { error } = await db.auth.signInWithPassword({ email: email, password: pass });
+
+    authLoginBtn.disabled = false;
+    authSignupBtn.disabled = false;
+
+    if (error) {
+        authStatusEl.textContent = error.message === 'Invalid login credentials'
+            ? 'Неверный e-mail или пароль'
+            : error.message;
+        return;
+    }
+
+    authPassEl.value = '';
+    authStatusEl.textContent = 'Вход выполнен — имя подтянуто из профиля';
+    syncNameToProfile();
+});
+
+authSignupBtn.addEventListener('click', async () => {
+    if (!db) return;
+    const email = authEmailEl.value.trim();
+    const pass = authPassEl.value;
+    if (!email || !pass) {
+        authStatusEl.textContent = 'Введи e-mail и пароль';
+        return;
+    }
+    if (pass.length < 6) {
+        authStatusEl.textContent = 'Пароль минимум 6 символов';
+        return;
+    }
+
+    authStatusEl.textContent = 'Создание аккаунта…';
+    authLoginBtn.disabled = true;
+    authSignupBtn.disabled = true;
+
+    const { data, error } = await db.auth.signUp({ email: email, password: pass });
+
+    authLoginBtn.disabled = false;
+    authSignupBtn.disabled = false;
+
+    if (error) {
+        authStatusEl.textContent = error.message;
+        return;
+    }
+
+    authPassEl.value = '';
+
+    if (data.session) {
+        authStatusEl.textContent = 'Аккаунт создан — вход выполнен';
+        syncNameToProfile();
+    } else {
+        authStatusEl.textContent = 'Аккаунт создан — подтверди e-mail по ссылке из письма';
+    }
+});
+
+authLogoutBtn.addEventListener('click', async () => {
+    if (db) {
+        try {
+            await db.auth.signOut();
+        } catch (e) {
+            console.warn(e.message);
+        }
+    }
+    authUser = null;
+    authStatusEl.textContent = 'Выход выполнен';
+    renderAuth();
+});
+
 initGame();
 playerNameEl.value = localStorage.getItem('snakeName') || '';
 refreshLeaders();
+initAuth();
 requestAnimationFrame(renderFrame);
