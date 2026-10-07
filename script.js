@@ -797,35 +797,35 @@ function renderFrame(now) {
 
 document.addEventListener('keydown', (e) => {
     if (e.target && (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA')) return;
-    switch (e.key.toLowerCase()) {
-        case 'arrowup':
-        case 'w':
-            e.preventDefault();
-            changeDirection(0, -1);
-            break;
-        case 'arrowdown':
-        case 's':
-            e.preventDefault();
-            changeDirection(0, 1);
-            break;
-        case 'arrowleft':
-        case 'a':
-            e.preventDefault();
-            changeDirection(-1, 0);
-            break;
-        case 'arrowright':
-        case 'd':
-            e.preventDefault();
-            changeDirection(1, 0);
-            break;
-        case ' ':
-        case 'spacebar':
-            e.preventDefault();
-            togglePause();
-            break;
-        case 'enter':
-            if (isGameOver) initGame();
-            break;
+
+    // физические клавиши (e.code) — раскладка не влияет
+    const code = e.code || '';
+    const key = (e.key || '').toLowerCase();
+
+    const isUp = code === 'ArrowUp' || code === 'KeyW' || key === 'arrowup' || key === 'w' || key === 'ц';
+    const isDown = code === 'ArrowDown' || code === 'KeyS' || key === 'arrowdown' || key === 's' || key === 'ы';
+    const isLeft = code === 'ArrowLeft' || code === 'KeyA' || key === 'arrowleft' || key === 'a' || key === 'ф';
+    const isRight = code === 'ArrowRight' || code === 'KeyD' || key === 'arrowright' || key === 'd' || key === 'в';
+    const isSpace = code === 'Space' || key === ' ' || key === 'spacebar';
+    const isEnter = code === 'Enter' || key === 'enter';
+
+    if (isUp) {
+        e.preventDefault();
+        changeDirection(0, -1);
+    } else if (isDown) {
+        e.preventDefault();
+        changeDirection(0, 1);
+    } else if (isLeft) {
+        e.preventDefault();
+        changeDirection(-1, 0);
+    } else if (isRight) {
+        e.preventDefault();
+        changeDirection(1, 0);
+    } else if (isSpace) {
+        e.preventDefault();
+        togglePause();
+    } else if (isEnter) {
+        if (isGameOver) initGame();
     }
 });
 
