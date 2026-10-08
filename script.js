@@ -1,4 +1,4 @@
-const canvas = document.getElementById('gameCanvas');
+﻿const canvas = document.getElementById('gameCanvas');
 let ctx = canvas.getContext('2d');
 const stage = canvas.parentElement;
 
@@ -39,6 +39,12 @@ const joinRoomBtn = document.getElementById('joinRoomBtn');
 const leaveRoomBtn = document.getElementById('leaveRoomBtn');
 const roomStatusEl = document.getElementById('roomStatus');
 const quickNameEl = document.getElementById('quickName');
+const startMenuEl = document.getElementById('startMenu');
+const backBtn = document.getElementById('backBtn');
+const homeBtn = document.getElementById('homeBtn');
+const soloStartBtn = document.getElementById('soloStartBtn');
+const mpStartBtn = document.getElementById('mpStartBtn');
+const mpLeadersListEl = document.getElementById('mpLeadersList');
 
 const INITIAL_SPEED = 150;
 const SPEED_INCREASE = 1.5;
@@ -59,6 +65,9 @@ let nextVelocityY = 0;
 let score = 0;
 let isSubmitted = false;
 let lastScoreValue = 0;
+let lastMpWin = false;
+
+let sessionMode = null; // 'solo' | 'mp' | null
 
 /* multiplayer */
 let mode = 'solo';
@@ -139,6 +148,7 @@ highScoreEl.textContent = highScore;
 
 tabs.forEach(tab => {
     tab.addEventListener('click', () => {
+        if (tab.classList.contains('locked')) return;
         tabs.forEach(t => t.classList.remove('active'));
         panels.forEach(p => p.classList.remove('active'));
         tab.classList.add('active');
@@ -146,13 +156,14 @@ tabs.forEach(tab => {
         panel.classList.add('active');
 
         const id = tab.dataset.panel;
-        const isLeaders = id === 'leaders';
+        const isLeaders = id === 'leaders' || id === 'mpLeaders';
         panelsEl.classList.toggle('tall', isLeaders || id === 'auth' || id === 'mp' || id === 'wardrobe');
-        if (isLeaders) refreshLeaders();
+        if (id === 'leaders') refreshLeaders();
+        if (id === 'mpLeaders') refreshMpLeaders();
         if (id === 'wardrobe') {
             previewSkin = null;
             skinNameEl.value = playerNameEl.value || localStorage.getItem('snakeName') || '';
-            setWardStatus('Кликни любую вещь — примерь её на змейке');
+            setWardStatus('╨Ъ╨╗╨╕╨║╨╜╨╕ ╨╗╤О╨▒╤Г╤О ╨▓╨╡╤Й╤М тАФ ╨┐╤А╨╕╨╝╨╡╤А╤М ╨╡╤С ╨╜╨░ ╨╖╨╝╨╡╨╣╨║╨╡');
             wardMarkActive();
         } else if (previewSkin) {
             previewSkin = null;
@@ -222,7 +233,7 @@ function resizeCanvas() {
     food.y = ((food.y % tileCount) + tileCount) % tileCount;
 }
 
-// гость подстраивает сетку под хоста
+// ╨│╨╛╤Б╤В╤М ╨┐╨╛╨┤╤Б╤В╤А╨░╨╕╨▓╨░╨╡╤В ╤Б╨╡╤В╨║╤Г ╨┐╨╛╨┤ ╤Е╨╛╤Б╤В╨░
 function applyTileCount(tc) {
     if (tc === tileCount) return;
     tileCount = tc;
@@ -262,6 +273,7 @@ function isOnSnake(x, y) {
 /* ---------------- game flow ---------------- */
 
 function initGame() {
+    if (sessionMode === 'mp') return;
     resizeCanvas();
 
     snake = [];
@@ -299,13 +311,15 @@ function gameLoop() {
         return;
     }
 
+    if (sessionMode === 'mp') return;
+
     velocityX = nextVelocityX;
     velocityY = nextVelocityY;
 
     let hx = snake[0].x + velocityX;
     let hy = snake[0].y + velocityY;
 
-    // выход из противоположной стены
+    // ╨▓╤Л╤Е╨╛╨┤ ╨╕╨╖ ╨┐╤А╨╛╤В╨╕╨▓╨╛╨┐╨╛╨╗╨╛╨╢╨╜╨╛╨╣ ╤Б╤В╨╡╨╜╤Л
     if (hx < 0) hx = tileCount - 1;
     else if (hx >= tileCount) hx = 0;
     if (hy < 0) hy = tileCount - 1;
@@ -358,6 +372,7 @@ function gameOver() {
 
 function togglePause() {
     if (isGameOver || mode === 'mp') return;
+    if (!startMenuEl.classList.contains('hidden')) return;
     isPaused = !isPaused;
     pauseEl.classList.toggle('hidden', !isPaused);
 }
@@ -834,7 +849,7 @@ function drawSegment(px, py, index, t, vx, vy, skin) {
     ctx.fill();
     ctx.restore();
 
-    // тень снизу (объём)
+    // ╤В╨╡╨╜╤М ╤Б╨╜╨╕╨╖╤Г (╨╛╨▒╤К╤С╨╝)
     ctx.save();
     ctx.beginPath();
     ctx.arc(cx, cy, r, 0, Math.PI * 2);
@@ -846,7 +861,7 @@ function drawSegment(px, py, index, t, vx, vy, skin) {
     ctx.fillRect(cx - r, cy - r, r * 2, r * 2);
     ctx.restore();
 
-    // блик
+    // ╨▒╨╗╨╕╨║
     ctx.fillStyle = 'rgba(255,255,255,0.5)';
     ctx.beginPath();
     ctx.ellipse(cx - r * 0.3, cy - r * 0.36, r * 0.3, r * 0.16, -0.6, 0, Math.PI * 2);
@@ -1013,7 +1028,7 @@ function drawHeadFace(cx, cy, r, t, vx, vy) {
         ctx.fill();
     });
 
-    // язык
+    // ╤П╨╖╤Л╨║
     if (Math.sin(t * 7) > 0.55) {
         const len = r * 1.5;
         const sx = cx + fx * r * 0.8;
@@ -1062,7 +1077,33 @@ function drawSnakeSet(segments, vx, vy, skin, t) {
     }
 }
 
-function drawSnake(t) {
+function drawSnakeSetInterp(prevSegs, nextSegs, prevVx, prevVy, alpha, skin, t) {
+    if (!prevSegs || !nextSegs || prevSegs.length !== nextSegs.length || prevSegs.length === 0) return;
+    for (let i = 0; i < prevSegs.length - 1; i++) {
+        const a0 = prevSegs[i], a1 = nextSegs[i];
+        const b0 = prevSegs[i + 1], b1 = nextSegs[i + 1];
+        const d0 = torusDelta(a0, b0);
+        const d1 = torusDelta(a1, b1);
+        const ax0 = a0.x * tileSize + tileSize / 2;
+        const ay0 = a0.y * tileSize + tileSize / 2;
+        const ax1 = a1.x * tileSize + tileSize / 2;
+        const ay1 = a1.y * tileSize + tileSize / 2;
+        const bx0 = ax0 + d0.dx * tileSize;
+        const by0 = ay0 + d0.dy * tileSize;
+        const bx1 = ax1 + d1.dx * tileSize;
+        const by1 = ay1 + d1.dy * tileSize;
+        const ax = ax0 + (ax1 - ax0) * alpha;
+        const ay = ay0 + (ay1 - ay0) * alpha;
+        const bx = bx0 + (bx1 - bx0) * alpha;
+        const by = by0 + (by1 - by0) * alpha;
+        const pa = wrappedCopies(a0)[0] || a0;
+        const px = pa.x * tileSize + tileSize / 2;
+        const py = pa.y * tileSize + tileSize / 2;
+        const ox = px - ax;
+        const oy = py - ay;
+        drawConnector(px, py, bx + ox, by + oy, i, skin);
+    }
+}function drawSnake(t) {
     drawSnakeSet(snake, velocityX, velocityY, activeLook(), t);
 }
 
@@ -1106,14 +1147,14 @@ function renderFrame(now) {
 document.addEventListener('keydown', (e) => {
     if (e.target && (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA')) return;
 
-    // физические клавиши (e.code) — раскладка не влияет
+    // ╤Д╨╕╨╖╨╕╤З╨╡╤Б╨║╨╕╨╡ ╨║╨╗╨░╨▓╨╕╤И╨╕ (e.code) тАФ ╤А╨░╤Б╨║╨╗╨░╨┤╨║╨░ ╨╜╨╡ ╨▓╨╗╨╕╤П╨╡╤В
     const code = e.code || '';
     const key = (e.key || '').toLowerCase();
 
-    const isUp = code === 'ArrowUp' || code === 'KeyW' || key === 'arrowup' || key === 'w' || key === 'ц';
-    const isDown = code === 'ArrowDown' || code === 'KeyS' || key === 'arrowdown' || key === 's' || key === 'ы';
-    const isLeft = code === 'ArrowLeft' || code === 'KeyA' || key === 'arrowleft' || key === 'a' || key === 'ф';
-    const isRight = code === 'ArrowRight' || code === 'KeyD' || key === 'arrowright' || key === 'd' || key === 'в';
+    const isUp = code === 'ArrowUp' || code === 'KeyW' || key === 'arrowup' || key === 'w' || key === '╤Ж';
+    const isDown = code === 'ArrowDown' || code === 'KeyS' || key === 'arrowdown' || key === 's' || key === '╤Л';
+    const isLeft = code === 'ArrowLeft' || code === 'KeyA' || key === 'arrowleft' || key === 'a' || key === '╤Д';
+    const isRight = code === 'ArrowRight' || code === 'KeyD' || key === 'arrowright' || key === 'd' || key === '╨▓';
     const isSpace = code === 'Space' || key === ' ' || key === 'spacebar';
     const isEnter = code === 'Enter' || key === 'enter';
 
@@ -1184,7 +1225,7 @@ canvas.addEventListener('touchend', (e) => {
 
 /* ---------------- multiplayer ---------------- */
 
-const MP_TICK = 110;
+const MP_TICK = 80;
 const MP_COUNTDOWN_TICKS = Math.round(3000 / MP_TICK);
 const ROOM_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 const clientId = Math.random().toString(36).slice(2, 10);
@@ -1241,13 +1282,14 @@ function showResultOverlay(kind) {
         resultTitleEl.classList.add('winner');
         grantChest();
     } else if (kind === 'draw') {
-        resultTitleEl.textContent = 'НИЧЬЯ';
+        resultTitleEl.textContent = '╨Э╨Ш╨з╨м╨п';
         resultTitleEl.classList.add('draw');
     } else {
         resultTitleEl.textContent = 'LOSER';
         resultTitleEl.classList.add('loser');
     }
 
+    lastMpWin = kind === 'win';
     const solo = kind === 'solo';
     soloResultEl.classList.toggle('hidden', !solo);
     mpResultEl.classList.toggle('hidden', solo);
@@ -1314,7 +1356,7 @@ function mpStartRound() {
 
     placeFood();
     mpUpdateHud();
-    mpStatus('Код: ' + roomCode + ' — раунд начинается!');
+    mpStatus('╨Ъ╨╛╨┤: ' + roomCode + ' тАФ ╤А╨░╤Г╨╜╨┤ ╨╜╨░╤З╨╕╨╜╨░╨╡╤В╤Б╤П!');
 
     clearInterval(gameLoopId);
     gameLoopId = setInterval(gameLoop, MP_TICK);
@@ -1392,8 +1434,28 @@ function onMpState(st) {
 
     if (st.tc) applyTileCount(st.tc);
 
-    mpSelf = st.s2.map(a => ({ x: a[0], y: a[1] }));
-    mpOther = st.s1.map(a => ({ x: a[0], y: a[1] }));
+    const newSelf = st.s2.map(a => ({ x: a[0], y: a[1] }));
+    const newOther = st.s1.map(a => ({ x: a[0], y: a[1] }));
+    const now = performance.now();
+    if (mpPrevOther === null) {
+        mpPrevOther = newOther.map(p => ({ x: p.x, y: p.y }));
+        mpNextOther = newOther.map(p => ({ x: p.x, y: p.y }));
+        mpPrevOtherVel = { x: st.v1[0], y: st.v1[1] };
+        mpNextOtherVel = { x: st.v1[0], y: st.v1[1] };
+        mpStateT0 = now - MP_TICK;
+        mpStateT1 = now;
+        mpHasInterpState = true;
+    } else {
+        mpPrevOther = mpNextOther.map(p => ({ x: p.x, y: p.y }));
+        mpNextOther = newOther.map(p => ({ x: p.x, y: p.y }));
+        mpPrevOtherVel = { x: mpNextOtherVel.x, y: mpNextOtherVel.y };
+        mpNextOtherVel = { x: st.v1[0], y: st.v1[1] };
+        mpStateT0 = mpStateT1;
+        mpStateT1 = now;
+        mpHasInterpState = true;
+    }
+    mpSelf = newSelf;
+    mpOther = newOther;
     mpSelfVel = { x: st.v2[0], y: st.v2[1] };
     mpOtherVel = { x: st.v1[0], y: st.v1[1] };
     food = { x: st.f[0], y: st.f[1], type: st.f[2] };
@@ -1402,7 +1464,20 @@ function onMpState(st) {
     mpOver = st.over;
     mpWinner = st.w;
     if (st.sk && st.sk[0]) mpOtherSkin = st.sk[0];
-
+    const dtPred = Math.min(MP_TICK * 1.5, now - (mpLastStateAt || now));
+    mpLastStateAt = now;
+    if (mpPredictedSelf === null || mpPredictedSelf.length !== mpSelf.length) {
+        mpPredictedSelf = mpSelf.map(p => ({ x: p.x, y: p.y }));
+    }
+    let steps = Math.max(1, Math.floor(dtPred / (MP_TICK * 0.5)));
+    if (steps > 3) steps = 3;
+    for (let s = 0; s < steps; s++) {
+        const head = mpPredictedSelf[0];
+        const nhx = head.x + mpSelfVel.x;
+        const nhy = head.y + mpSelfVel.y;
+        const nh = { x: ((nhx % cols) + cols) % cols, y: ((nhy % rows) + rows) % rows };
+        mpPredictedSelf = [nh].concat(mpPredictedSelf.slice(0, mpPredictedSelf.length - 1));
+    }
     mpUpdateHud();
 
     if (st.over) {
@@ -1417,9 +1492,9 @@ function onMpState(st) {
     if (!gameOverEl.classList.contains('hidden')) hideResultOverlay();
 
     if (st.c > 0) {
-        mpStatus('Отсчёт…');
+        mpStatus('╨Ю╤В╤Б╤З╤С╤ВтАж');
     } else {
-        mpStatus('Бой идёт! Код: ' + roomCode);
+        mpStatus('╨С╨╛╨╣ ╨╕╨┤╤С╤В! ╨Ъ╨╛╨┤: ' + roomCode);
     }
 }
 
@@ -1445,7 +1520,7 @@ function onMpPresence() {
                     mpHostGoneTimer = null;
                     if (channel && mpStateSeen && Object.keys(channel.presenceState()).length < 2) {
                         leaveRoom();
-                        mpStatus('Соперник вышел — игра окончена');
+                        mpStatus('╨б╨╛╨┐╨╡╤А╨╜╨╕╨║ ╨▓╤Л╤И╨╡╨╗ тАФ ╨╕╨│╤А╨░ ╨╛╨║╨╛╨╜╤З╨╡╨╜╨░');
                     }
                 }, 1500);
             }
@@ -1461,7 +1536,7 @@ function onMpPresence() {
     if (count >= 2) {
         if (!mpOpponentOnline) {
             mpOpponentOnline = true;
-            mpStatus('Соперник найден! Код: ' + roomCode);
+            mpStatus('╨б╨╛╨┐╨╡╤А╨╜╨╕╨║ ╨╜╨░╨╣╨┤╨╡╨╜! ╨Ъ╨╛╨┤: ' + roomCode);
             mpStartRound();
         }
         return;
@@ -1469,7 +1544,7 @@ function onMpPresence() {
 
     if (mpOpponentOnline) {
         mpOpponentOnline = false;
-        mpStatus('Соперник вышел. Ждём нового… Код: ' + roomCode);
+        mpStatus('╨б╨╛╨┐╨╡╤А╨╜╨╕╨║ ╨▓╤Л╤И╨╡╨╗. ╨Ц╨┤╤С╨╝ ╨╜╨╛╨▓╨╛╨│╨╛тАж ╨Ъ╨╛╨┤: ' + roomCode);
         if (!mpOver) {
             mpOver = true;
             mpWinner = 1;
@@ -1482,7 +1557,7 @@ function onMpPresence() {
 
 function connectRoom(code, asHost) {
     if (!db) {
-        mpStatus('Нужны ключи Supabase в supabase-config.js');
+        mpStatus('╨Э╤Г╨╢╨╜╤Л ╨║╨╗╤О╤З╨╕ Supabase ╨▓ supabase-config.js');
         return;
     }
 
@@ -1522,20 +1597,20 @@ function connectRoom(code, asHost) {
         if (status === 'SUBSCRIBED') {
             channel.track({ role: role, id: clientId });
             if (role === 'host') {
-                mpStatus('Код: ' + code + ' — ждём соперника…');
+                mpStatus('╨Ъ╨╛╨┤: ' + code + ' тАФ ╨╢╨┤╤С╨╝ ╤Б╨╛╨┐╨╡╤А╨╜╨╕╨║╨░тАж');
             } else {
                 mpSend('skin', playerSkin);
-                mpStatus('Подключение…');
+                mpStatus('╨Я╨╛╨┤╨║╨╗╤О╤З╨╡╨╜╨╕╨╡тАж');
                 clearTimeout(mpJoinTimer);
                 mpJoinTimer = setTimeout(() => {
                     if (!mpStateSeen) {
                         leaveRoom();
-                        mpStatus('Комната не найдена');
+                        mpStatus('╨Ъ╨╛╨╝╨╜╨░╤В╨░ ╨╜╨╡ ╨╜╨░╨╣╨┤╨╡╨╜╨░');
                     }
                 }, 4000);
             }
         } else if (status === 'CHANNEL_ERROR') {
-            mpStatus('Ошибка подключения к Realtime');
+            mpStatus('╨Ю╤И╨╕╨▒╨║╨░ ╨┐╨╛╨┤╨║╨╗╤О╤З╨╡╨╜╨╕╤П ╨║ Realtime');
         }
     });
 }
@@ -1565,7 +1640,7 @@ function leaveRoom(silent) {
 
     if (!silent && wasMp) {
         initGame();
-        mpStatus('Создай комнату или введи код друга');
+        mpStatus('╨б╨╛╨╖╨┤╨░╨╣ ╨║╨╛╨╝╨╜╨░╤В╤Г ╨╕╨╗╨╕ ╨▓╨▓╨╡╨┤╨╕ ╨║╨╛╨┤ ╨┤╤А╤Г╨│╨░');
     }
 }
 
@@ -1575,7 +1650,7 @@ function handleRestart() {
             mpStartRound();
         } else {
             mpSend('again', {});
-            mpStatus('Ждём соперника…');
+            mpStatus('╨Ц╨┤╤С╨╝ ╤Б╨╛╨┐╨╡╤А╨╜╨╕╨║╨░тАж');
         }
         return;
     }
@@ -1591,7 +1666,7 @@ createRoomBtn.addEventListener('click', () => {
 joinRoomBtn.addEventListener('click', () => {
     const code = (roomInputEl.value || '').trim().toUpperCase();
     if (!/^[A-Z0-9]{4}$/.test(code)) {
-        mpStatus('Код — 4 символа: буквы и цифры');
+        mpStatus('╨Ъ╨╛╨┤ тАФ 4 ╤Б╨╕╨╝╨▓╨╛╨╗╨░: ╨▒╤Г╨║╨▓╤Л ╨╕ ╤Ж╨╕╤Д╤А╤Л');
         return;
     }
     connectRoom(code, false);
@@ -1639,7 +1714,7 @@ async function fetchLeaders() {
             if (error) throw error;
             return { rows: data || [], online: true };
         } catch (e) {
-            console.warn('Не удалось загрузить таблицу лидеров:', e.message);
+            console.warn('╨Э╨╡ ╤Г╨┤╨░╨╗╨╛╤Б╤М ╨╖╨░╨│╤А╤Г╨╖╨╕╤В╤М ╤В╨░╨▒╨╗╨╕╤Ж╤Г ╨╗╨╕╨┤╨╡╤А╨╛╨▓:', e.message);
         }
     }
     return { rows: readLocalLeaders().slice(0, LEADERS_LIMIT), online: false };
@@ -1652,7 +1727,7 @@ async function submitScore(name, value) {
             if (error) throw error;
             return true;
         } catch (e) {
-            console.warn('Не удалось сохранить результат:', e.message);
+            console.warn('╨Э╨╡ ╤Г╨┤╨░╨╗╨╛╤Б╤М ╤Б╨╛╤Е╤А╨░╨╜╨╕╤В╤М ╤А╨╡╨╖╤Г╨╗╤М╤В╨░╤В:', e.message);
             return false;
         }
     }
@@ -1670,14 +1745,14 @@ function renderLeaders(res) {
     const head = document.createElement('li');
     head.className = 'leaders-head';
     head.textContent = res.online
-        ? 'Онлайн-таблица лидеров'
-        : 'Локальная таблица (Supabase не настроен)';
+        ? '╨Ю╨╜╨╗╨░╨╣╨╜-╤В╨░╨▒╨╗╨╕╤Ж╨░ ╨╗╨╕╨┤╨╡╤А╨╛╨▓'
+        : '╨Ы╨╛╨║╨░╨╗╤М╨╜╨░╤П ╤В╨░╨▒╨╗╨╕╤Ж╨░ (Supabase ╨╜╨╡ ╨╜╨░╤Б╤В╤А╨╛╨╡╨╜)';
     leadersListEl.appendChild(head);
 
     if (!res.rows.length) {
         const empty = document.createElement('li');
         empty.className = 'leaders-empty';
-        empty.textContent = 'Пока пусто — будь первым!';
+        empty.textContent = '╨Я╨╛╨║╨░ ╨┐╤Г╤Б╤В╨╛ тАФ ╨▒╤Г╨┤╤М ╨┐╨╡╤А╨▓╤Л╨╝!';
         leadersListEl.appendChild(empty);
         return;
     }
@@ -1707,29 +1782,215 @@ async function refreshLeaders() {
     renderLeaders(await fetchLeaders());
 }
 
+/* ---------------- start menu ---------------- */
+
+function openMenu() {
+    if (mode === 'mp') leaveRoom(true);
+    gameOverEl.classList.add('hidden');
+    chestOverlayEl.classList.add('hidden');
+    pauseEl.classList.add('hidden');
+    startMenuEl.classList.remove('hidden');
+    isPaused = true;
+    sessionMode = null;
+    tabs.forEach(t => t.classList.remove('locked'));
+    backBtn.classList.add('hidden');
+}
+
+function closeMenu() {
+    startMenuEl.classList.add('hidden');
+    isPaused = false;
+}
+
+function selectTab(id) {
+    tabs.forEach(t => t.classList.toggle('active', t.dataset.panel === id));
+    panels.forEach(p => p.classList.toggle('active', p.id === 'panel-' + id));
+    panelsEl.classList.toggle('tall', id === 'leaders' || id === 'mpLeaders' || id === 'auth' || id === 'mp' || id === 'wardrobe');
+    if (id === 'leaders') refreshLeaders();
+    if (id === 'mpLeaders') refreshMpLeaders();
+    if (id === 'wardrobe') {
+        previewSkin = null;
+        skinNameEl.value = playerNameEl.value || localStorage.getItem('snakeName') || '';
+        setWardStatus('Кликну любую вещь — примерь её на змейке');
+        wardMarkActive();
+    } else if (previewSkin) {
+        previewSkin = null;
+        wardMarkActive();
+    }
+    setTimeout(resizeCanvas, 0);
+}
+
+soloStartBtn.addEventListener('click', () => {
+    sessionMode = 'solo';
+    closeMenu();
+    tabs.forEach(t => t.classList.toggle('locked', t.dataset.panel === 'mp'));
+    backBtn.classList.remove('hidden');
+    selectTab('score');
+    clearInterval(gameLoopId);
+    initGame();
+});
+
+mpStartBtn.addEventListener('click', () => {
+    sessionMode = 'mp';
+    closeMenu();
+    if (mode === 'mp') leaveRoom(true);
+    tabs.forEach(t => t.classList.toggle('locked', t.dataset.panel === 'score'));
+    backBtn.classList.remove('hidden');
+    selectTab('mp');
+    roomInputEl.focus();
+});
+
+homeBtn.addEventListener('click', openMenu);
+backBtn.addEventListener('click', openMenu);
+
+/* ---------------- multiplayer leaderboard ---------------- */
+
+let mpBoard = 'points';
+
+function plural(n, one, few, many) {
+    const m10 = n % 10;
+    const m100 = n % 100;
+    if (m10 === 1 && m100 !== 11) return one;
+    if (m10 >= 2 && m10 <= 4 && (m100 < 12 || m100 > 14)) return few;
+    return many;
+}
+
+function readLocalMpResults() {
+    try {
+        return JSON.parse(localStorage.getItem('snakeMpResults')) || [];
+    } catch (e) {
+        return [];
+    }
+}
+
+async function submitMpScore(name, value, win) {
+    if (db) {
+        try {
+            const { error } = await db.from('mp_scores').insert({ name: name, points: value, win: !!win });
+            if (error) throw error;
+            return true;
+        } catch (e) {
+            console.warn('Не удалось сохранить результат мультиплеера:', e.message);
+            return false;
+        }
+    }
+
+    const list = readLocalMpResults();
+    list.push({ name: name, points: value, win: !!win });
+    localStorage.setItem('snakeMpResults', JSON.stringify(list.slice(-300)));
+    return true;
+}
+
+function aggregateMp(rows, board) {
+    const map = {};
+    rows.forEach(r => {
+        const name = String(r.name || '').trim().slice(0, 16);
+        if (!name) return;
+        if (!map[name]) map[name] = { name: name, points: 0, wins: 0 };
+        map[name].points += Number(r.points) || 0;
+        if (r.win) map[name].wins++;
+    });
+    const list = Object.values(map);
+    list.sort((a, b) =>
+        board === 'wins'
+            ? (b.wins - a.wins) || (b.points - a.points)
+            : (b.points - a.points) || (b.wins - a.wins));
+    return list.slice(0, LEADERS_LIMIT);
+}
+
+async function fetchMpLeaders(board) {
+    if (db) {
+        try {
+            const { data, error } = await db.from('mp_scores').select('name, points, win');
+            if (error) throw error;
+            return { rows: aggregateMp(data || [], board), online: true };
+        } catch (e) {
+            console.warn('Не удалось загрузить таблицу лидеров мультиплеера:', e.message);
+        }
+    }
+    return { rows: aggregateMp(readLocalMpResults(), board), online: false };
+}
+
+async function refreshMpLeaders() {
+    renderMpLeaders(await fetchMpLeaders(mpBoard));
+}
+
+function renderMpLeaders(res) {
+    mpLeadersListEl.innerHTML = '';
+
+    const head = document.createElement('li');
+    head.className = 'leaders-head';
+    head.textContent = res.online
+        ? (mpBoard === 'wins' ? 'Мультиплеер · победы (всего)' : 'Мультиплеер · очки (всего)')
+        : (mpBoard === 'wins' ? 'Мультиплеер · победы (локально)' : 'Мультиплеер · очки (локально)');
+    mpLeadersListEl.appendChild(head);
+
+    if (!res.rows.length) {
+        const empty = document.createElement('li');
+        empty.className = 'leaders-empty';
+        empty.textContent = 'Пока пусто — сыграй в мультиплеер!';
+        mpLeadersListEl.appendChild(empty);
+        return;
+    }
+
+    res.rows.forEach((row, i) => {
+        const li = document.createElement('li');
+        li.className = 'leaders-row' + (row.name === playerNameEl.value ? ' me' : '');
+
+        const rank = document.createElement('span');
+        rank.className = 'rank';
+        rank.textContent = (i + 1) + '.';
+
+        const name = document.createElement('span');
+        name.className = 'name';
+        name.textContent = row.name;
+
+        const wins = document.createElement('span');
+        wins.className = 'wins';
+        wins.textContent = row.wins + ' ' + plural(row.wins, 'победа', 'победы', 'побед');
+
+        const pts = document.createElement('span');
+        pts.className = 'pts';
+        pts.textContent = row.points + ' ' + plural(row.points, 'очко', 'очка', 'очков');
+
+        li.append(rank, name, wins, pts);
+        mpLeadersListEl.appendChild(li);
+    });
+}
+
+document.querySelectorAll('.mp-leader-switch .ward-chip').forEach(b => {
+    b.addEventListener('click', () => {
+        mpBoard = b.dataset.board;
+        document.querySelectorAll('.mp-leader-switch .ward-chip').forEach(x => x.classList.toggle('active', x === b));
+        refreshMpLeaders();
+    });
+});
+
 saveScoreBtn.addEventListener('click', async () => {
     if (isSubmitted) return;
 
     const name = (playerNameEl.value || '').trim().slice(0, 16);
     if (!name) {
-        saveStatusEl.textContent = 'Введи имя';
+        saveStatusEl.textContent = '╨Т╨▓╨╡╨┤╨╕ ╨╕╨╝╤П';
         playerNameEl.focus();
         return;
     }
 
     localStorage.setItem('snakeName', name);
     saveScoreBtn.disabled = true;
-    saveStatusEl.textContent = 'Отправка…';
+    saveStatusEl.textContent = '╨Ю╤В╨┐╤А╨░╨▓╨║╨░тАж';
     quickNameEl.value = name;
     skinNameEl.value = name;
 
-    const ok = await submitScore(name, lastScoreValue);
+    const ok = mode === 'mp'
+        ? await submitMpScore(name, lastScoreValue, lastMpWin)
+        : await submitScore(name, lastScoreValue);
     isSubmitted = ok;
-    saveStatusEl.textContent = ok ? 'Результат сохранён!' : 'Нет связи — попробуй ещё раз';
+    saveStatusEl.textContent = ok ? '╨а╨╡╨╖╤Г╨╗╤М╤В╨░╤В ╤Б╨╛╤Е╤А╨░╨╜╤С╨╜!' : '╨Э╨╡╤В ╤Б╨▓╤П╨╖╨╕ тАФ ╨┐╨╛╨┐╤А╨╛╨▒╤Г╨╣ ╨╡╤Й╤С ╤А╨░╨╖';
     saveScoreBtn.disabled = ok;
 
     if (ok) syncNameToProfile();
-    refreshLeaders();
+    if (mode === 'mp') refreshMpLeaders();
+    else refreshLeaders();
 });
 
 playerNameEl.addEventListener('keydown', (e) => {
@@ -1775,12 +2036,12 @@ function renderAuth() {
     authUserBox.classList.toggle('hidden', !loggedIn);
 
     if (loggedIn) {
-        authWhoEl.textContent = 'Ты: ' + (authUser.email || '');
+        authWhoEl.textContent = '╨в╤Л: ' + (authUser.email || '');
         const n = authProfileName();
         if (n) setPlayerName(n, 'auth');
     }
 
-    saveScoreBtn.textContent = loggedIn ? 'Сохранить результат' : 'В таблицу лидеров';
+    saveScoreBtn.textContent = loggedIn ? '╨б╨╛╤Е╤А╨░╨╜╨╕╤В╤М ╤А╨╡╨╖╤Г╨╗╤М╤В╨░╤В' : '╨Т ╤В╨░╨▒╨╗╨╕╤Ж╤Г ╨╗╨╕╨┤╨╡╤А╨╛╨▓';
 }
 
 async function syncNameToProfile() {
@@ -1790,13 +2051,13 @@ async function syncNameToProfile() {
     try {
         await db.auth.updateUser({ data: { name: name } });
     } catch (e) {
-        console.warn('Не удалось сохранить имя профиля:', e.message);
+        console.warn('╨Э╨╡ ╤Г╨┤╨░╨╗╨╛╤Б╤М ╤Б╨╛╤Е╤А╨░╨╜╨╕╤В╤М ╨╕╨╝╤П ╨┐╤А╨╛╤Д╨╕╨╗╤П:', e.message);
     }
 }
 
 async function initAuth() {
     if (!db) {
-        authStatusEl.textContent = 'Авторизация недоступна — не вставлены ключи Supabase';
+        authStatusEl.textContent = '╨Р╨▓╤В╨╛╤А╨╕╨╖╨░╤Ж╨╕╤П ╨╜╨╡╨┤╨╛╤Б╤В╤Г╨┐╨╜╨░ тАФ ╨╜╨╡ ╨▓╤Б╤В╨░╨▓╨╗╨╡╨╜╤Л ╨║╨╗╤О╤З╨╕ Supabase';
         renderAuth();
         return;
     }
@@ -1821,11 +2082,11 @@ authLoginBtn.addEventListener('click', async () => {
     const email = authEmailEl.value.trim();
     const pass = authPassEl.value;
     if (!email || !pass) {
-        authStatusEl.textContent = 'Введи e-mail и пароль';
+        authStatusEl.textContent = '╨Т╨▓╨╡╨┤╨╕ e-mail ╨╕ ╨┐╨░╤А╨╛╨╗╤М';
         return;
     }
 
-    authStatusEl.textContent = 'Вход…';
+    authStatusEl.textContent = '╨Т╤Е╨╛╨┤тАж';
     authLoginBtn.disabled = true;
     authSignupBtn.disabled = true;
 
@@ -1836,13 +2097,13 @@ authLoginBtn.addEventListener('click', async () => {
 
     if (error) {
         authStatusEl.textContent = error.message === 'Invalid login credentials'
-            ? 'Неверный e-mail или пароль'
+            ? '╨Э╨╡╨▓╨╡╤А╨╜╤Л╨╣ e-mail ╨╕╨╗╨╕ ╨┐╨░╤А╨╛╨╗╤М'
             : error.message;
         return;
     }
 
     authPassEl.value = '';
-    authStatusEl.textContent = 'Вход выполнен — имя подтянуто из профиля';
+    authStatusEl.textContent = '╨Т╤Е╨╛╨┤ ╨▓╤Л╨┐╨╛╨╗╨╜╨╡╨╜ тАФ ╨╕╨╝╤П ╨┐╨╛╨┤╤В╤П╨╜╤Г╤В╨╛ ╨╕╨╖ ╨┐╤А╨╛╤Д╨╕╨╗╤П';
     syncNameToProfile();
 });
 
@@ -1851,15 +2112,15 @@ authSignupBtn.addEventListener('click', async () => {
     const email = authEmailEl.value.trim();
     const pass = authPassEl.value;
     if (!email || !pass) {
-        authStatusEl.textContent = 'Введи e-mail и пароль';
+        authStatusEl.textContent = '╨Т╨▓╨╡╨┤╨╕ e-mail ╨╕ ╨┐╨░╤А╨╛╨╗╤М';
         return;
     }
     if (pass.length < 6) {
-        authStatusEl.textContent = 'Пароль минимум 6 символов';
+        authStatusEl.textContent = '╨Я╨░╤А╨╛╨╗╤М ╨╝╨╕╨╜╨╕╨╝╤Г╨╝ 6 ╤Б╨╕╨╝╨▓╨╛╨╗╨╛╨▓';
         return;
     }
 
-    authStatusEl.textContent = 'Создание аккаунта…';
+    authStatusEl.textContent = '╨б╨╛╨╖╨┤╨░╨╜╨╕╨╡ ╨░╨║╨║╨░╤Г╨╜╤В╨░тАж';
     authLoginBtn.disabled = true;
     authSignupBtn.disabled = true;
 
@@ -1876,10 +2137,10 @@ authSignupBtn.addEventListener('click', async () => {
     authPassEl.value = '';
 
     if (data.session) {
-        authStatusEl.textContent = 'Аккаунт создан — вход выполнен';
+        authStatusEl.textContent = '╨Р╨║╨║╨░╤Г╨╜╤В ╤Б╨╛╨╖╨┤╨░╨╜ тАФ ╨▓╤Е╨╛╨┤ ╨▓╤Л╨┐╨╛╨╗╨╜╨╡╨╜';
         syncNameToProfile();
     } else {
-        authStatusEl.textContent = 'Аккаунт создан — подтверди e-mail по ссылке из письма';
+        authStatusEl.textContent = '╨Р╨║╨║╨░╤Г╨╜╤В ╤Б╨╛╨╖╨┤╨░╨╜ тАФ ╨┐╨╛╨┤╤В╨▓╨╡╤А╨┤╨╕ e-mail ╨┐╨╛ ╤Б╤Б╤Л╨╗╨║╨╡ ╨╕╨╖ ╨┐╨╕╤Б╤М╨╝╨░';
     }
 });
 
@@ -1892,7 +2153,7 @@ authLogoutBtn.addEventListener('click', async () => {
         }
     }
     authUser = null;
-    authStatusEl.textContent = 'Выход выполнен';
+    authStatusEl.textContent = '╨Т╤Л╤Е╨╛╨┤ ╨▓╤Л╨┐╨╛╨╗╨╜╨╡╨╜';
     renderAuth();
 });
 
@@ -1900,28 +2161,28 @@ authLogoutBtn.addEventListener('click', async () => {
 /* ---------------- wardrobe ---------------- */
 
 const HUE_SWATCHES = [
-    { label: 'Зелёный', hue: 145 },
-    { label: 'Синий', hue: 210 },
-    { label: 'Бирюзовый', hue: 175 },
-    { label: 'Фиолетовый', hue: 275 },
-    { label: 'Красный', hue: 355 },
-    { label: 'Оранжевый', hue: 28 },
-    { label: 'Жёлтый', hue: 48 },
-    { label: 'Розовый', hue: 330 }
+    { label: '╨Ч╨╡╨╗╤С╨╜╤Л╨╣', hue: 145 },
+    { label: '╨б╨╕╨╜╨╕╨╣', hue: 210 },
+    { label: '╨С╨╕╤А╤О╨╖╨╛╨▓╤Л╨╣', hue: 175 },
+    { label: '╨д╨╕╨╛╨╗╨╡╤В╨╛╨▓╤Л╨╣', hue: 275 },
+    { label: '╨Ъ╤А╨░╤Б╨╜╤Л╨╣', hue: 355 },
+    { label: '╨Ю╤А╨░╨╜╨╢╨╡╨▓╤Л╨╣', hue: 28 },
+    { label: '╨Ц╤С╨╗╤В╤Л╨╣', hue: 48 },
+    { label: '╨а╨╛╨╖╨╛╨▓╤Л╨╣', hue: 330 }
 ];
 
 const PATTERN_OPTIONS = [
-    { id: 'none', label: 'Нет' },
-    { id: 'stripes', label: 'Полосы' },
-    { id: 'spots', label: 'Точки' }
+    { id: 'none', label: '╨Э╨╡╤В' },
+    { id: 'stripes', label: '╨Я╨╛╨╗╨╛╤Б╤Л' },
+    { id: 'spots', label: '╨в╨╛╤З╨║╨╕' }
 ];
 
 const HAT_OPTIONS = [
-    { id: 'none', label: 'Без шапки' },
-    { id: 'crown', label: 'Корона' },
-    { id: 'party', label: 'Колпак' },
-    { id: 'cap', label: 'Кепка' },
-    { id: 'helm', label: 'Шлем' }
+    { id: 'none', label: '╨С╨╡╨╖ ╤И╨░╨┐╨║╨╕' },
+    { id: 'crown', label: '╨Ъ╨╛╤А╨╛╨╜╨░' },
+    { id: 'party', label: '╨Ъ╨╛╨╗╨┐╨░╨║' },
+    { id: 'cap', label: '╨Ъ╨╡╨┐╨║╨░' },
+    { id: 'helm', label: '╨и╨╗╨╡╨╝' }
 ];
 
 const wardPanelEl = document.getElementById('panel-wardrobe');
@@ -1995,7 +2256,7 @@ function buildWardrobe() {
         b.addEventListener('click', () => {
             if (!isHueOpen(s.hue)) {
                 previewSkin = { hue: s.hue, pattern: playerSkin.pattern, hat: playerSkin.hat };
-                setWardStatus('Примерка: цвет «' + s.label + '» — закрыто, нужен сундук');
+                setWardStatus('╨Я╤А╨╕╨╝╨╡╤А╨║╨░: ╤Ж╨▓╨╡╤В ┬л' + s.label + '┬╗ тАФ ╨╖╨░╨║╤А╤Л╤В╨╛, ╨╜╤Г╨╢╨╡╨╜ ╤Б╤Г╨╜╨┤╤Г╨║');
                 wardMarkActive();
                 return;
             }
@@ -2015,7 +2276,7 @@ function buildWardrobe() {
         b.addEventListener('click', () => {
             if (!isPatternOpen(p.id)) {
                 previewSkin = { hue: playerSkin.hue, pattern: p.id, hat: playerSkin.hat };
-                setWardStatus('Примерка: детали «' + p.label + '» — закрыто, нужен сундук');
+                setWardStatus('╨Я╤А╨╕╨╝╨╡╤А╨║╨░: ╨┤╨╡╤В╨░╨╗╨╕ ┬л' + p.label + '┬╗ тАФ ╨╖╨░╨║╤А╤Л╤В╨╛, ╨╜╤Г╨╢╨╡╨╜ ╤Б╤Г╨╜╨┤╤Г╨║');
                 wardMarkActive();
                 return;
             }
@@ -2035,7 +2296,7 @@ function buildWardrobe() {
         b.addEventListener('click', () => {
             if (!isHatOpen(h.id)) {
                 previewSkin = { hue: playerSkin.hue, pattern: playerSkin.pattern, hat: h.id };
-                setWardStatus('Примерка: шапка «' + h.label + '» — закрыто, нужен сундук');
+                setWardStatus('╨Я╤А╨╕╨╝╨╡╤А╨║╨░: ╤И╨░╨┐╨║╨░ ┬л' + h.label + '┬╗ тАФ ╨╖╨░╨║╤А╤Л╤В╨╛, ╨╜╤Г╨╢╨╡╨╜ ╤Б╤Г╨╜╨┤╤Г╨║');
                 wardMarkActive();
                 return;
             }
@@ -2053,13 +2314,13 @@ function buildWardrobe() {
 function saveMyName() {
     const name = (skinNameEl.value || '').trim().slice(0, 16);
     if (!name) {
-        setWardStatus('Имя не может быть пустым');
+        setWardStatus('╨Ш╨╝╤П ╨╜╨╡ ╨╝╨╛╨╢╨╡╤В ╨▒╤Л╤В╤М ╨┐╤Г╤Б╤В╤Л╨╝');
         skinNameEl.focus();
         return;
     }
     setPlayerName(name, 'ward');
     refreshLeaders();
-    setWardStatus('Имя сохранено: ' + name);
+    setWardStatus('╨Ш╨╝╤П ╤Б╨╛╤Е╤А╨░╨╜╨╡╨╜╨╛: ' + name);
 }
 
 skinNameBtn.addEventListener('click', saveMyName);
@@ -2086,7 +2347,7 @@ function grantChest() {
 
 function updateChestUi() {
     const n = unlocks.chests;
-    const label = n > 0 ? 'Открыть сундук (' + n + ')' : 'Открыть сундук';
+    const label = n > 0 ? '╨Ю╤В╨║╤А╤Л╤В╤М ╤Б╤Г╨╜╨┤╤Г╨║ (' + n + ')' : '╨Ю╤В╨║╤А╤Л╤В╤М ╤Б╤Г╨╜╨┤╤Г╨║';
     chestBtn.textContent = label;
     wardChestBtn.textContent = label;
     chestBtn.classList.toggle('hidden', n === 0);
@@ -2097,13 +2358,13 @@ function updateChestUi() {
 function randomLockedItem() {
     const pool = [];
     HUE_SWATCHES.forEach(s => {
-        if (!isHueOpen(s.hue)) pool.push({ type: 'hue', id: s.hue, label: 'цвет «' + s.label + '»' });
+        if (!isHueOpen(s.hue)) pool.push({ type: 'hue', id: s.hue, label: '╤Ж╨▓╨╡╤В ┬л' + s.label + '┬╗' });
     });
     PATTERN_OPTIONS.forEach(p => {
-        if (p.id !== 'none' && !isPatternOpen(p.id)) pool.push({ type: 'pattern', id: p.id, label: 'детали «' + p.label + '»' });
+        if (p.id !== 'none' && !isPatternOpen(p.id)) pool.push({ type: 'pattern', id: p.id, label: '╨┤╨╡╤В╨░╨╗╨╕ ┬л' + p.label + '┬╗' });
     });
     HAT_OPTIONS.forEach(h => {
-        if (h.id !== 'none' && !isHatOpen(h.id)) pool.push({ type: 'hat', id: h.id, label: 'шапка «' + h.label + '»' });
+        if (h.id !== 'none' && !isHatOpen(h.id)) pool.push({ type: 'hat', id: h.id, label: '╤И╨░╨┐╨║╨░ ┬л' + h.label + '┬╗' });
     });
     if (!pool.length) return null;
     return pool[Math.floor(Math.random() * pool.length)];
@@ -2112,8 +2373,8 @@ function randomLockedItem() {
 function openChestModal() {
     chestState = 'closed';
     pendingItem = null;
-    chestResultEl.textContent = 'Сундук заперт — нажми «Открыть»';
-    chestOpenBtn.textContent = 'Открыть';
+    chestResultEl.textContent = '╨б╤Г╨╜╨┤╤Г╨║ ╨╖╨░╨┐╨╡╤А╤В тАФ ╨╜╨░╨╢╨╝╨╕ ┬л╨Ю╤В╨║╤А╤Л╤В╤М┬╗';
+    chestOpenBtn.textContent = '╨Ю╤В╨║╤А╤Л╤В╤М';
     chestOpenBtn.disabled = false;
     chestCloseBtn.disabled = false;
     chestOverlayEl.classList.remove('hidden');
@@ -2140,13 +2401,13 @@ function revealChestItem() {
         else unlocks.hats.push(pendingItem.id);
         saveUnlocks();
         wardMarkActive();
-        setWardStatus('Новое в гардеробе: ' + pendingItem.label);
+        setWardStatus('╨Э╨╛╨▓╨╛╨╡ ╨▓ ╨│╨░╤А╨┤╨╡╤А╨╛╨▒╨╡: ' + pendingItem.label);
     }
 
     chestResultEl.textContent = pendingItem
-        ? 'Получено: ' + pendingItem.label
-        : 'Все награды уже собраны!';
-    chestOpenBtn.textContent = 'Забрать';
+        ? '╨Я╨╛╨╗╤Г╤З╨╡╨╜╨╛: ' + pendingItem.label
+        : '╨Т╤Б╨╡ ╨╜╨░╨│╤А╨░╨┤╤Л ╤Г╨╢╨╡ ╤Б╨╛╨▒╤А╨░╨╜╤Л!';
+    chestOpenBtn.textContent = '╨Ч╨░╨▒╤А╨░╤В╤М';
     chestOpenBtn.disabled = false;
     chestCloseBtn.disabled = true;
     updateChestUi();
@@ -2170,7 +2431,7 @@ chestOpenBtn.addEventListener('click', () => {
         chestAnimStart = performance.now();
         chestOpenBtn.disabled = true;
         chestCloseBtn.disabled = true;
-        chestResultEl.textContent = 'Сундук открывается…';
+        chestResultEl.textContent = '╨б╤Г╨╜╨┤╤Г╨║ ╨╛╤В╨║╤А╤Л╨▓╨░╨╡╤В╤Б╤ПтАж';
     } else if (chestState === 'opened') {
         closeChestModal();
     }
@@ -2455,6 +2716,7 @@ skinNameEl.value = playerNameEl.value;
 quickNameEl.value = playerNameEl.value;
 refreshLeaders();
 initAuth();
+openMenu();
 requestAnimationFrame(renderFrame);
 
 window.__snakeState = {
@@ -2473,3 +2735,12 @@ window.__snakeState = {
         };
     }
 };
+
+
+
+
+
+
+
+
+
