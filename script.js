@@ -88,6 +88,10 @@ let mpOpponentOnline = false;
 let mpOverlayShown = false;
 let mpJoinTimer = null;
 let mpHostGoneTimer = null;
+let mpHasInterpState = false;
+let mpPrevOther = null, mpNextOther = null;
+let mpPrevOtherVel = { x: 0, y: 0 }, mpNextOtherVel = { x: 0, y: 0 };
+let mpStateT0 = 0, mpStateT1 = 0;
 
 /* wardrobe */
 const DEFAULT_SKIN = { hue: 145, pattern: 'none', hat: 'none' };
@@ -1467,20 +1471,7 @@ function onMpState(st) {
     mpOver = st.over;
     mpWinner = st.w;
     if (st.sk && st.sk[0]) mpOtherSkin = st.sk[0];
-    const dtPred = Math.min(MP_TICK * 1.5, now - (mpLastStateAt || now));
-    mpLastStateAt = now;
-    if (mpPredictedSelf === null || mpPredictedSelf.length !== mpSelf.length) {
-        mpPredictedSelf = mpSelf.map(p => ({ x: p.x, y: p.y }));
-    }
-    let steps = Math.max(1, Math.floor(dtPred / (MP_TICK * 0.5)));
-    if (steps > 3) steps = 3;
-    for (let s = 0; s < steps; s++) {
-        const head = mpPredictedSelf[0];
-        const nhx = head.x + mpSelfVel.x;
-        const nhy = head.y + mpSelfVel.y;
-        const nh = { x: ((nhx % cols) + cols) % cols, y: ((nhy % rows) + rows) % rows };
-        mpPredictedSelf = [nh].concat(mpPredictedSelf.slice(0, mpPredictedSelf.length - 1));
-    }
+
     mpUpdateHud();
 
     if (st.over) {
