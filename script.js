@@ -68,6 +68,7 @@ let lastScoreValue = 0;
 let lastMpWin = false;
 
 let sessionMode = null; // 'solo' | 'mp' | null
+let lastSaveKind = null; // 'solo' | 'mp' — в какую таблицу лидеров писать последний результат
 
 /* multiplayer */
 let mode = 'solo';
@@ -163,7 +164,7 @@ tabs.forEach(tab => {
         if (id === 'wardrobe') {
             previewSkin = null;
             skinNameEl.value = playerNameEl.value || localStorage.getItem('snakeName') || '';
-            setWardStatus('╨Ъ╨╗╨╕╨║╨╜╨╕ ╨╗╤О╨▒╤Г╤О ╨▓╨╡╤Й╤М тАФ ╨┐╤А╨╕╨╝╨╡╤А╤М ╨╡╤С ╨╜╨░ ╨╖╨╝╨╡╨╣╨║╨╡');
+            setWardStatus('Кликни любую вещь — примерь её на змейке');
             wardMarkActive();
         } else if (previewSkin) {
             previewSkin = null;
@@ -233,7 +234,7 @@ function resizeCanvas() {
     food.y = ((food.y % tileCount) + tileCount) % tileCount;
 }
 
-// ╨│╨╛╤Б╤В╤М ╨┐╨╛╨┤╤Б╤В╤А╨░╨╕╨▓╨░╨╡╤В ╤Б╨╡╤В╨║╤Г ╨┐╨╛╨┤ ╤Е╨╛╤Б╤В╨░
+// гость подстраивает сетку под хоста
 function applyTileCount(tc) {
     if (tc === tileCount) return;
     tileCount = tc;
@@ -319,7 +320,7 @@ function gameLoop() {
     let hx = snake[0].x + velocityX;
     let hy = snake[0].y + velocityY;
 
-    // ╨▓╤Л╤Е╨╛╨┤ ╨╕╨╖ ╨┐╤А╨╛╤В╨╕╨▓╨╛╨┐╨╛╨╗╨╛╨╢╨╜╨╛╨╣ ╤Б╤В╨╡╨╜╤Л
+    // выход из противоположной стены
     if (hx < 0) hx = tileCount - 1;
     else if (hx >= tileCount) hx = 0;
     if (hy < 0) hy = tileCount - 1;
@@ -358,6 +359,7 @@ function gameLoop() {
 
 function gameOver() {
     isGameOver = true;
+    lastSaveKind = 'solo';
     lastScoreValue = score;
     finalScoreEl.textContent = score;
     isSubmitted = false;
@@ -849,7 +851,7 @@ function drawSegment(px, py, index, t, vx, vy, skin) {
     ctx.fill();
     ctx.restore();
 
-    // ╤В╨╡╨╜╤М ╤Б╨╜╨╕╨╖╤Г (╨╛╨▒╤К╤С╨╝)
+    // тень снизу (объём)
     ctx.save();
     ctx.beginPath();
     ctx.arc(cx, cy, r, 0, Math.PI * 2);
@@ -861,7 +863,7 @@ function drawSegment(px, py, index, t, vx, vy, skin) {
     ctx.fillRect(cx - r, cy - r, r * 2, r * 2);
     ctx.restore();
 
-    // ╨▒╨╗╨╕╨║
+    // блик
     ctx.fillStyle = 'rgba(255,255,255,0.5)';
     ctx.beginPath();
     ctx.ellipse(cx - r * 0.3, cy - r * 0.36, r * 0.3, r * 0.16, -0.6, 0, Math.PI * 2);
@@ -1028,7 +1030,7 @@ function drawHeadFace(cx, cy, r, t, vx, vy) {
         ctx.fill();
     });
 
-    // ╤П╨╖╤Л╨║
+    // язык
     if (Math.sin(t * 7) > 0.55) {
         const len = r * 1.5;
         const sx = cx + fx * r * 0.8;
@@ -1147,14 +1149,14 @@ function renderFrame(now) {
 document.addEventListener('keydown', (e) => {
     if (e.target && (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA')) return;
 
-    // ╤Д╨╕╨╖╨╕╤З╨╡╤Б╨║╨╕╨╡ ╨║╨╗╨░╨▓╨╕╤И╨╕ (e.code) тАФ ╤А╨░╤Б╨║╨╗╨░╨┤╨║╨░ ╨╜╨╡ ╨▓╨╗╨╕╤П╨╡╤В
+    // физические клавиши (e.code) — раскладка не влияет
     const code = e.code || '';
     const key = (e.key || '').toLowerCase();
 
-    const isUp = code === 'ArrowUp' || code === 'KeyW' || key === 'arrowup' || key === 'w' || key === '╤Ж';
-    const isDown = code === 'ArrowDown' || code === 'KeyS' || key === 'arrowdown' || key === 's' || key === '╤Л';
-    const isLeft = code === 'ArrowLeft' || code === 'KeyA' || key === 'arrowleft' || key === 'a' || key === '╤Д';
-    const isRight = code === 'ArrowRight' || code === 'KeyD' || key === 'arrowright' || key === 'd' || key === '╨▓';
+    const isUp = code === 'ArrowUp' || code === 'KeyW' || key === 'arrowup' || key === 'w' || key === 'ц';
+    const isDown = code === 'ArrowDown' || code === 'KeyS' || key === 'arrowdown' || key === 's' || key === 'ы';
+    const isLeft = code === 'ArrowLeft' || code === 'KeyA' || key === 'arrowleft' || key === 'a' || key === 'ф';
+    const isRight = code === 'ArrowRight' || code === 'KeyD' || key === 'arrowright' || key === 'd' || key === 'в';
     const isSpace = code === 'Space' || key === ' ' || key === 'spacebar';
     const isEnter = code === 'Enter' || key === 'enter';
 
@@ -1282,7 +1284,7 @@ function showResultOverlay(kind) {
         resultTitleEl.classList.add('winner');
         grantChest();
     } else if (kind === 'draw') {
-        resultTitleEl.textContent = '╨Э╨Ш╨з╨м╨п';
+        resultTitleEl.textContent = 'НИЧЬЯ';
         resultTitleEl.classList.add('draw');
     } else {
         resultTitleEl.textContent = 'LOSER';
@@ -1290,6 +1292,7 @@ function showResultOverlay(kind) {
     }
 
     lastMpWin = kind === 'win';
+    lastSaveKind = kind === 'solo' ? 'solo' : 'mp';
     const solo = kind === 'solo';
     soloResultEl.classList.toggle('hidden', !solo);
     mpResultEl.classList.toggle('hidden', solo);
@@ -1356,7 +1359,7 @@ function mpStartRound() {
 
     placeFood();
     mpUpdateHud();
-    mpStatus('╨Ъ╨╛╨┤: ' + roomCode + ' тАФ ╤А╨░╤Г╨╜╨┤ ╨╜╨░╤З╨╕╨╜╨░╨╡╤В╤Б╤П!');
+    mpStatus('Код: ' + roomCode + ' — раунд начинается!');
 
     clearInterval(gameLoopId);
     gameLoopId = setInterval(gameLoop, MP_TICK);
@@ -1492,9 +1495,9 @@ function onMpState(st) {
     if (!gameOverEl.classList.contains('hidden')) hideResultOverlay();
 
     if (st.c > 0) {
-        mpStatus('╨Ю╤В╤Б╤З╤С╤ВтАж');
+        mpStatus('Отсчёт…');
     } else {
-        mpStatus('╨С╨╛╨╣ ╨╕╨┤╤С╤В! ╨Ъ╨╛╨┤: ' + roomCode);
+        mpStatus('Бой идёт! Код: ' + roomCode);
     }
 }
 
@@ -1520,7 +1523,7 @@ function onMpPresence() {
                     mpHostGoneTimer = null;
                     if (channel && mpStateSeen && Object.keys(channel.presenceState()).length < 2) {
                         leaveRoom();
-                        mpStatus('╨б╨╛╨┐╨╡╤А╨╜╨╕╨║ ╨▓╤Л╤И╨╡╨╗ тАФ ╨╕╨│╤А╨░ ╨╛╨║╨╛╨╜╤З╨╡╨╜╨░');
+                        mpStatus('Соперник вышел — игра окончена');
                     }
                 }, 1500);
             }
@@ -1536,7 +1539,7 @@ function onMpPresence() {
     if (count >= 2) {
         if (!mpOpponentOnline) {
             mpOpponentOnline = true;
-            mpStatus('╨б╨╛╨┐╨╡╤А╨╜╨╕╨║ ╨╜╨░╨╣╨┤╨╡╨╜! ╨Ъ╨╛╨┤: ' + roomCode);
+            mpStatus('Соперник найден! Код: ' + roomCode);
             mpStartRound();
         }
         return;
@@ -1544,7 +1547,7 @@ function onMpPresence() {
 
     if (mpOpponentOnline) {
         mpOpponentOnline = false;
-        mpStatus('╨б╨╛╨┐╨╡╤А╨╜╨╕╨║ ╨▓╤Л╤И╨╡╨╗. ╨Ц╨┤╤С╨╝ ╨╜╨╛╨▓╨╛╨│╨╛тАж ╨Ъ╨╛╨┤: ' + roomCode);
+        mpStatus('Соперник вышел. Ждём нового… Код: ' + roomCode);
         if (!mpOver) {
             mpOver = true;
             mpWinner = 1;
@@ -1557,7 +1560,7 @@ function onMpPresence() {
 
 function connectRoom(code, asHost) {
     if (!db) {
-        mpStatus('╨Э╤Г╨╢╨╜╤Л ╨║╨╗╤О╤З╨╕ Supabase ╨▓ supabase-config.js');
+        mpStatus('Нужны ключи Supabase в supabase-config.js');
         return;
     }
 
@@ -1597,20 +1600,20 @@ function connectRoom(code, asHost) {
         if (status === 'SUBSCRIBED') {
             channel.track({ role: role, id: clientId });
             if (role === 'host') {
-                mpStatus('╨Ъ╨╛╨┤: ' + code + ' тАФ ╨╢╨┤╤С╨╝ ╤Б╨╛╨┐╨╡╤А╨╜╨╕╨║╨░тАж');
+                mpStatus('Код: ' + code + ' — ждём соперника…');
             } else {
                 mpSend('skin', playerSkin);
-                mpStatus('╨Я╨╛╨┤╨║╨╗╤О╤З╨╡╨╜╨╕╨╡тАж');
+                mpStatus('Подключение…');
                 clearTimeout(mpJoinTimer);
                 mpJoinTimer = setTimeout(() => {
                     if (!mpStateSeen) {
                         leaveRoom();
-                        mpStatus('╨Ъ╨╛╨╝╨╜╨░╤В╨░ ╨╜╨╡ ╨╜╨░╨╣╨┤╨╡╨╜╨░');
+                        mpStatus('Комната не найдена');
                     }
                 }, 4000);
             }
         } else if (status === 'CHANNEL_ERROR') {
-            mpStatus('╨Ю╤И╨╕╨▒╨║╨░ ╨┐╨╛╨┤╨║╨╗╤О╤З╨╡╨╜╨╕╤П ╨║ Realtime');
+            mpStatus('Ошибка подключения к Realtime');
         }
     });
 }
@@ -1639,8 +1642,10 @@ function leaveRoom(silent) {
     roomUi(false);
 
     if (!silent && wasMp) {
+        gameOverEl.classList.add('hidden');
+        pauseEl.classList.add('hidden');
         initGame();
-        mpStatus('╨б╨╛╨╖╨┤╨░╨╣ ╨║╨╛╨╝╨╜╨░╤В╤Г ╨╕╨╗╨╕ ╨▓╨▓╨╡╨┤╨╕ ╨║╨╛╨┤ ╨┤╤А╤Г╨│╨░');
+        mpStatus('Создай комнату или введи код друга');
     }
 }
 
@@ -1650,7 +1655,7 @@ function handleRestart() {
             mpStartRound();
         } else {
             mpSend('again', {});
-            mpStatus('╨Ц╨┤╤С╨╝ ╤Б╨╛╨┐╨╡╤А╨╜╨╕╨║╨░тАж');
+            mpStatus('Ждём соперника…');
         }
         return;
     }
@@ -1666,7 +1671,7 @@ createRoomBtn.addEventListener('click', () => {
 joinRoomBtn.addEventListener('click', () => {
     const code = (roomInputEl.value || '').trim().toUpperCase();
     if (!/^[A-Z0-9]{4}$/.test(code)) {
-        mpStatus('╨Ъ╨╛╨┤ тАФ 4 ╤Б╨╕╨╝╨▓╨╛╨╗╨░: ╨▒╤Г╨║╨▓╤Л ╨╕ ╤Ж╨╕╤Д╤А╤Л');
+        mpStatus('Код — 4 символа: буквы и цифры');
         return;
     }
     connectRoom(code, false);
@@ -1712,12 +1717,12 @@ async function fetchLeaders() {
                 .order('score', { ascending: false })
                 .limit(LEADERS_LIMIT);
             if (error) throw error;
-            return { rows: data || [], online: true };
+            return { rows: data || [], online: true, local: false };
         } catch (e) {
-            console.warn('╨Э╨╡ ╤Г╨┤╨░╨╗╨╛╤Б╤М ╨╖╨░╨│╤А╤Г╨╖╨╕╤В╤М ╤В╨░╨▒╨╗╨╕╤Ж╤Г ╨╗╨╕╨┤╨╡╤А╨╛╨▓:', e.message);
+            console.warn('Не удалось загрузить таблицу лидеров:', e.message);
         }
     }
-    return { rows: readLocalLeaders().slice(0, LEADERS_LIMIT), online: false };
+    return { rows: readLocalLeaders().slice(0, LEADERS_LIMIT), online: false, local: !db };
 }
 
 async function submitScore(name, value) {
@@ -1727,8 +1732,7 @@ async function submitScore(name, value) {
             if (error) throw error;
             return true;
         } catch (e) {
-            console.warn('╨Э╨╡ ╤Г╨┤╨░╨╗╨╛╤Б╤М ╤Б╨╛╤Е╤А╨░╨╜╨╕╤В╤М ╤А╨╡╨╖╤Г╨╗╤М╤В╨░╤В:', e.message);
-            return false;
+            console.warn('Не удалось сохранить результат:', e.message);
         }
     }
 
@@ -1745,14 +1749,16 @@ function renderLeaders(res) {
     const head = document.createElement('li');
     head.className = 'leaders-head';
     head.textContent = res.online
-        ? '╨Ю╨╜╨╗╨░╨╣╨╜-╤В╨░╨▒╨╗╨╕╤Ж╨░ ╨╗╨╕╨┤╨╡╤А╨╛╨▓'
-        : '╨Ы╨╛╨║╨░╨╗╤М╨╜╨░╤П ╤В╨░╨▒╨╗╨╕╤Ж╨░ (Supabase ╨╜╨╡ ╨╜╨░╤Б╤В╤А╨╛╨╡╨╜)';
+        ? 'Онлайн-таблица лидеров'
+        : (res.local
+            ? 'Локальная таблица (Supabase не настроен)'
+            : 'Нет связи с сервером — показаны локальные результаты');
     leadersListEl.appendChild(head);
 
     if (!res.rows.length) {
         const empty = document.createElement('li');
         empty.className = 'leaders-empty';
-        empty.textContent = '╨Я╨╛╨║╨░ ╨┐╤Г╤Б╤В╨╛ тАФ ╨▒╤Г╨┤╤М ╨┐╨╡╤А╨▓╤Л╨╝!';
+        empty.textContent = 'Пока пусто — будь первым!';
         leadersListEl.appendChild(empty);
         return;
     }
@@ -1870,7 +1876,6 @@ async function submitMpScore(name, value, win) {
             return true;
         } catch (e) {
             console.warn('Не удалось сохранить результат мультиплеера:', e.message);
-            return false;
         }
     }
 
@@ -1900,14 +1905,16 @@ function aggregateMp(rows, board) {
 async function fetchMpLeaders(board) {
     if (db) {
         try {
-            const { data, error } = await db.from('mp_scores').select('name, points, win');
+            const { data, error } = await db.from('mp_scores').select('name, points, win').limit(2000);
             if (error) throw error;
-            return { rows: aggregateMp(data || [], board), online: true };
+            return { rows: aggregateMp(data || [], board), online: true, local: false, missingTable: false };
         } catch (e) {
             console.warn('Не удалось загрузить таблицу лидеров мультиплеера:', e.message);
+            const missing = /PGRST205|Could not find the table/i.test(String((e && e.message) || e));
+            return { rows: aggregateMp(readLocalMpResults(), board), online: false, local: false, missingTable: missing };
         }
     }
-    return { rows: aggregateMp(readLocalMpResults(), board), online: false };
+    return { rows: aggregateMp(readLocalMpResults(), board), online: false, local: true, missingTable: false };
 }
 
 async function refreshMpLeaders() {
@@ -1921,8 +1928,17 @@ function renderMpLeaders(res) {
     head.className = 'leaders-head';
     head.textContent = res.online
         ? (mpBoard === 'wins' ? 'Мультиплеер · победы (всего)' : 'Мультиплеер · очки (всего)')
-        : (mpBoard === 'wins' ? 'Мультиплеер · победы (локально)' : 'Мультиплеер · очки (локально)');
+        : (res.local
+            ? (mpBoard === 'wins' ? 'Мультиплеер · победы (локально)' : 'Мультиплеер · очки (локально)')
+            : (mpBoard === 'wins' ? 'Мультиплеер · победы (нет связи — локально)' : 'Мультиплеер · очки (нет связи — локально)'));
     mpLeadersListEl.appendChild(head);
+
+    if (!res.online && res.missingTable) {
+        const hint = document.createElement('li');
+        hint.className = 'leaders-empty';
+        hint.textContent = 'Общая таблица не создана в Supabase: выполни файл mp_scores.sql в SQL Editor — пока рейтинг локальный';
+        mpLeadersListEl.appendChild(hint);
+    }
 
     if (!res.rows.length) {
         const empty = document.createElement('li');
@@ -1970,26 +1986,26 @@ saveScoreBtn.addEventListener('click', async () => {
 
     const name = (playerNameEl.value || '').trim().slice(0, 16);
     if (!name) {
-        saveStatusEl.textContent = '╨Т╨▓╨╡╨┤╨╕ ╨╕╨╝╤П';
+        saveStatusEl.textContent = 'Введи имя';
         playerNameEl.focus();
         return;
     }
 
     localStorage.setItem('snakeName', name);
     saveScoreBtn.disabled = true;
-    saveStatusEl.textContent = '╨Ю╤В╨┐╤А╨░╨▓╨║╨░тАж';
+    saveStatusEl.textContent = 'Отправка…';
     quickNameEl.value = name;
     skinNameEl.value = name;
 
-    const ok = mode === 'mp'
+    const ok = lastSaveKind === 'mp'
         ? await submitMpScore(name, lastScoreValue, lastMpWin)
         : await submitScore(name, lastScoreValue);
     isSubmitted = ok;
-    saveStatusEl.textContent = ok ? '╨а╨╡╨╖╤Г╨╗╤М╤В╨░╤В ╤Б╨╛╤Е╤А╨░╨╜╤С╨╜!' : '╨Э╨╡╤В ╤Б╨▓╤П╨╖╨╕ тАФ ╨┐╨╛╨┐╤А╨╛╨▒╤Г╨╣ ╨╡╤Й╤С ╤А╨░╨╖';
+    saveStatusEl.textContent = ok ? 'Результат сохранён!' : 'Нет связи — попробуй ещё раз';
     saveScoreBtn.disabled = ok;
 
     if (ok) syncNameToProfile();
-    if (mode === 'mp') refreshMpLeaders();
+    if (lastSaveKind === 'mp') refreshMpLeaders();
     else refreshLeaders();
 });
 
@@ -2036,12 +2052,12 @@ function renderAuth() {
     authUserBox.classList.toggle('hidden', !loggedIn);
 
     if (loggedIn) {
-        authWhoEl.textContent = '╨в╤Л: ' + (authUser.email || '');
+        authWhoEl.textContent = 'Ты: ' + (authUser.email || '');
         const n = authProfileName();
         if (n) setPlayerName(n, 'auth');
     }
 
-    saveScoreBtn.textContent = loggedIn ? '╨б╨╛╤Е╤А╨░╨╜╨╕╤В╤М ╤А╨╡╨╖╤Г╨╗╤М╤В╨░╤В' : '╨Т ╤В╨░╨▒╨╗╨╕╤Ж╤Г ╨╗╨╕╨┤╨╡╤А╨╛╨▓';
+    saveScoreBtn.textContent = loggedIn ? 'Сохранить результат' : 'В таблицу лидеров';
 }
 
 async function syncNameToProfile() {
@@ -2051,13 +2067,13 @@ async function syncNameToProfile() {
     try {
         await db.auth.updateUser({ data: { name: name } });
     } catch (e) {
-        console.warn('╨Э╨╡ ╤Г╨┤╨░╨╗╨╛╤Б╤М ╤Б╨╛╤Е╤А╨░╨╜╨╕╤В╤М ╨╕╨╝╤П ╨┐╤А╨╛╤Д╨╕╨╗╤П:', e.message);
+        console.warn('Не удалось сохранить имя профиля:', e.message);
     }
 }
 
 async function initAuth() {
     if (!db) {
-        authStatusEl.textContent = '╨Р╨▓╤В╨╛╤А╨╕╨╖╨░╤Ж╨╕╤П ╨╜╨╡╨┤╨╛╤Б╤В╤Г╨┐╨╜╨░ тАФ ╨╜╨╡ ╨▓╤Б╤В╨░╨▓╨╗╨╡╨╜╤Л ╨║╨╗╤О╤З╨╕ Supabase';
+        authStatusEl.textContent = 'Авторизация недоступна — не вставлены ключи Supabase';
         renderAuth();
         return;
     }
@@ -2082,11 +2098,11 @@ authLoginBtn.addEventListener('click', async () => {
     const email = authEmailEl.value.trim();
     const pass = authPassEl.value;
     if (!email || !pass) {
-        authStatusEl.textContent = '╨Т╨▓╨╡╨┤╨╕ e-mail ╨╕ ╨┐╨░╤А╨╛╨╗╤М';
+        authStatusEl.textContent = 'Введи e-mail и пароль';
         return;
     }
 
-    authStatusEl.textContent = '╨Т╤Е╨╛╨┤тАж';
+    authStatusEl.textContent = 'Вход…';
     authLoginBtn.disabled = true;
     authSignupBtn.disabled = true;
 
@@ -2097,13 +2113,13 @@ authLoginBtn.addEventListener('click', async () => {
 
     if (error) {
         authStatusEl.textContent = error.message === 'Invalid login credentials'
-            ? '╨Э╨╡╨▓╨╡╤А╨╜╤Л╨╣ e-mail ╨╕╨╗╨╕ ╨┐╨░╤А╨╛╨╗╤М'
+            ? 'Неверный e-mail или пароль'
             : error.message;
         return;
     }
 
     authPassEl.value = '';
-    authStatusEl.textContent = '╨Т╤Е╨╛╨┤ ╨▓╤Л╨┐╨╛╨╗╨╜╨╡╨╜ тАФ ╨╕╨╝╤П ╨┐╨╛╨┤╤В╤П╨╜╤Г╤В╨╛ ╨╕╨╖ ╨┐╤А╨╛╤Д╨╕╨╗╤П';
+    authStatusEl.textContent = 'Вход выполнен — имя подтянуто из профиля';
     syncNameToProfile();
 });
 
@@ -2112,15 +2128,15 @@ authSignupBtn.addEventListener('click', async () => {
     const email = authEmailEl.value.trim();
     const pass = authPassEl.value;
     if (!email || !pass) {
-        authStatusEl.textContent = '╨Т╨▓╨╡╨┤╨╕ e-mail ╨╕ ╨┐╨░╤А╨╛╨╗╤М';
+        authStatusEl.textContent = 'Введи e-mail и пароль';
         return;
     }
     if (pass.length < 6) {
-        authStatusEl.textContent = '╨Я╨░╤А╨╛╨╗╤М ╨╝╨╕╨╜╨╕╨╝╤Г╨╝ 6 ╤Б╨╕╨╝╨▓╨╛╨╗╨╛╨▓';
+        authStatusEl.textContent = 'Пароль минимум 6 символов';
         return;
     }
 
-    authStatusEl.textContent = '╨б╨╛╨╖╨┤╨░╨╜╨╕╨╡ ╨░╨║╨║╨░╤Г╨╜╤В╨░тАж';
+    authStatusEl.textContent = 'Создание аккаунта…';
     authLoginBtn.disabled = true;
     authSignupBtn.disabled = true;
 
@@ -2137,10 +2153,10 @@ authSignupBtn.addEventListener('click', async () => {
     authPassEl.value = '';
 
     if (data.session) {
-        authStatusEl.textContent = '╨Р╨║╨║╨░╤Г╨╜╤В ╤Б╨╛╨╖╨┤╨░╨╜ тАФ ╨▓╤Е╨╛╨┤ ╨▓╤Л╨┐╨╛╨╗╨╜╨╡╨╜';
+        authStatusEl.textContent = 'Аккаунт создан — вход выполнен';
         syncNameToProfile();
     } else {
-        authStatusEl.textContent = '╨Р╨║╨║╨░╤Г╨╜╤В ╤Б╨╛╨╖╨┤╨░╨╜ тАФ ╨┐╨╛╨┤╤В╨▓╨╡╤А╨┤╨╕ e-mail ╨┐╨╛ ╤Б╤Б╤Л╨╗╨║╨╡ ╨╕╨╖ ╨┐╨╕╤Б╤М╨╝╨░';
+        authStatusEl.textContent = 'Аккаунт создан — подтверди e-mail по ссылке из письма';
     }
 });
 
@@ -2153,7 +2169,7 @@ authLogoutBtn.addEventListener('click', async () => {
         }
     }
     authUser = null;
-    authStatusEl.textContent = '╨Т╤Л╤Е╨╛╨┤ ╨▓╤Л╨┐╨╛╨╗╨╜╨╡╨╜';
+    authStatusEl.textContent = 'Выход выполнен';
     renderAuth();
 });
 
@@ -2161,28 +2177,28 @@ authLogoutBtn.addEventListener('click', async () => {
 /* ---------------- wardrobe ---------------- */
 
 const HUE_SWATCHES = [
-    { label: '╨Ч╨╡╨╗╤С╨╜╤Л╨╣', hue: 145 },
-    { label: '╨б╨╕╨╜╨╕╨╣', hue: 210 },
-    { label: '╨С╨╕╤А╤О╨╖╨╛╨▓╤Л╨╣', hue: 175 },
-    { label: '╨д╨╕╨╛╨╗╨╡╤В╨╛╨▓╤Л╨╣', hue: 275 },
-    { label: '╨Ъ╤А╨░╤Б╨╜╤Л╨╣', hue: 355 },
-    { label: '╨Ю╤А╨░╨╜╨╢╨╡╨▓╤Л╨╣', hue: 28 },
-    { label: '╨Ц╤С╨╗╤В╤Л╨╣', hue: 48 },
-    { label: '╨а╨╛╨╖╨╛╨▓╤Л╨╣', hue: 330 }
+    { label: 'Зелёный', hue: 145 },
+    { label: 'Синий', hue: 210 },
+    { label: 'Бирюзовый', hue: 175 },
+    { label: 'Фиолетовый', hue: 275 },
+    { label: 'Красный', hue: 355 },
+    { label: 'Оранжевый', hue: 28 },
+    { label: 'Жёлтый', hue: 48 },
+    { label: 'Розовый', hue: 330 }
 ];
 
 const PATTERN_OPTIONS = [
-    { id: 'none', label: '╨Э╨╡╤В' },
-    { id: 'stripes', label: '╨Я╨╛╨╗╨╛╤Б╤Л' },
-    { id: 'spots', label: '╨в╨╛╤З╨║╨╕' }
+    { id: 'none', label: 'Нет' },
+    { id: 'stripes', label: 'Полосы' },
+    { id: 'spots', label: 'Точки' }
 ];
 
 const HAT_OPTIONS = [
-    { id: 'none', label: '╨С╨╡╨╖ ╤И╨░╨┐╨║╨╕' },
-    { id: 'crown', label: '╨Ъ╨╛╤А╨╛╨╜╨░' },
-    { id: 'party', label: '╨Ъ╨╛╨╗╨┐╨░╨║' },
-    { id: 'cap', label: '╨Ъ╨╡╨┐╨║╨░' },
-    { id: 'helm', label: '╨и╨╗╨╡╨╝' }
+    { id: 'none', label: 'Без шапки' },
+    { id: 'crown', label: 'Корона' },
+    { id: 'party', label: 'Колпак' },
+    { id: 'cap', label: 'Кепка' },
+    { id: 'helm', label: 'Шлем' }
 ];
 
 const wardPanelEl = document.getElementById('panel-wardrobe');
@@ -2256,7 +2272,7 @@ function buildWardrobe() {
         b.addEventListener('click', () => {
             if (!isHueOpen(s.hue)) {
                 previewSkin = { hue: s.hue, pattern: playerSkin.pattern, hat: playerSkin.hat };
-                setWardStatus('╨Я╤А╨╕╨╝╨╡╤А╨║╨░: ╤Ж╨▓╨╡╤В ┬л' + s.label + '┬╗ тАФ ╨╖╨░╨║╤А╤Л╤В╨╛, ╨╜╤Г╨╢╨╡╨╜ ╤Б╤Г╨╜╨┤╤Г╨║');
+                setWardStatus('Примерка: цвет «' + s.label + '» — закрыто, нужен сундук');
                 wardMarkActive();
                 return;
             }
@@ -2276,7 +2292,7 @@ function buildWardrobe() {
         b.addEventListener('click', () => {
             if (!isPatternOpen(p.id)) {
                 previewSkin = { hue: playerSkin.hue, pattern: p.id, hat: playerSkin.hat };
-                setWardStatus('╨Я╤А╨╕╨╝╨╡╤А╨║╨░: ╨┤╨╡╤В╨░╨╗╨╕ ┬л' + p.label + '┬╗ тАФ ╨╖╨░╨║╤А╤Л╤В╨╛, ╨╜╤Г╨╢╨╡╨╜ ╤Б╤Г╨╜╨┤╤Г╨║');
+                setWardStatus('Примерка: детали «' + p.label + '» — закрыто, нужен сундук');
                 wardMarkActive();
                 return;
             }
@@ -2296,7 +2312,7 @@ function buildWardrobe() {
         b.addEventListener('click', () => {
             if (!isHatOpen(h.id)) {
                 previewSkin = { hue: playerSkin.hue, pattern: playerSkin.pattern, hat: h.id };
-                setWardStatus('╨Я╤А╨╕╨╝╨╡╤А╨║╨░: ╤И╨░╨┐╨║╨░ ┬л' + h.label + '┬╗ тАФ ╨╖╨░╨║╤А╤Л╤В╨╛, ╨╜╤Г╨╢╨╡╨╜ ╤Б╤Г╨╜╨┤╤Г╨║');
+                setWardStatus('Примерка: шапка «' + h.label + '» — закрыто, нужен сундук');
                 wardMarkActive();
                 return;
             }
@@ -2314,13 +2330,13 @@ function buildWardrobe() {
 function saveMyName() {
     const name = (skinNameEl.value || '').trim().slice(0, 16);
     if (!name) {
-        setWardStatus('╨Ш╨╝╤П ╨╜╨╡ ╨╝╨╛╨╢╨╡╤В ╨▒╤Л╤В╤М ╨┐╤Г╤Б╤В╤Л╨╝');
+        setWardStatus('Имя не может быть пустым');
         skinNameEl.focus();
         return;
     }
     setPlayerName(name, 'ward');
     refreshLeaders();
-    setWardStatus('╨Ш╨╝╤П ╤Б╨╛╤Е╤А╨░╨╜╨╡╨╜╨╛: ' + name);
+    setWardStatus('Имя сохранено: ' + name);
 }
 
 skinNameBtn.addEventListener('click', saveMyName);
@@ -2347,7 +2363,7 @@ function grantChest() {
 
 function updateChestUi() {
     const n = unlocks.chests;
-    const label = n > 0 ? '╨Ю╤В╨║╤А╤Л╤В╤М ╤Б╤Г╨╜╨┤╤Г╨║ (' + n + ')' : '╨Ю╤В╨║╤А╤Л╤В╤М ╤Б╤Г╨╜╨┤╤Г╨║';
+    const label = n > 0 ? 'Открыть сундук (' + n + ')' : 'Открыть сундук';
     chestBtn.textContent = label;
     wardChestBtn.textContent = label;
     chestBtn.classList.toggle('hidden', n === 0);
@@ -2358,13 +2374,13 @@ function updateChestUi() {
 function randomLockedItem() {
     const pool = [];
     HUE_SWATCHES.forEach(s => {
-        if (!isHueOpen(s.hue)) pool.push({ type: 'hue', id: s.hue, label: '╤Ж╨▓╨╡╤В ┬л' + s.label + '┬╗' });
+        if (!isHueOpen(s.hue)) pool.push({ type: 'hue', id: s.hue, label: 'цвет «' + s.label + '»' });
     });
     PATTERN_OPTIONS.forEach(p => {
-        if (p.id !== 'none' && !isPatternOpen(p.id)) pool.push({ type: 'pattern', id: p.id, label: '╨┤╨╡╤В╨░╨╗╨╕ ┬л' + p.label + '┬╗' });
+        if (p.id !== 'none' && !isPatternOpen(p.id)) pool.push({ type: 'pattern', id: p.id, label: 'детали «' + p.label + '»' });
     });
     HAT_OPTIONS.forEach(h => {
-        if (h.id !== 'none' && !isHatOpen(h.id)) pool.push({ type: 'hat', id: h.id, label: '╤И╨░╨┐╨║╨░ ┬л' + h.label + '┬╗' });
+        if (h.id !== 'none' && !isHatOpen(h.id)) pool.push({ type: 'hat', id: h.id, label: 'шапка «' + h.label + '»' });
     });
     if (!pool.length) return null;
     return pool[Math.floor(Math.random() * pool.length)];
@@ -2373,8 +2389,8 @@ function randomLockedItem() {
 function openChestModal() {
     chestState = 'closed';
     pendingItem = null;
-    chestResultEl.textContent = '╨б╤Г╨╜╨┤╤Г╨║ ╨╖╨░╨┐╨╡╤А╤В тАФ ╨╜╨░╨╢╨╝╨╕ ┬л╨Ю╤В╨║╤А╤Л╤В╤М┬╗';
-    chestOpenBtn.textContent = '╨Ю╤В╨║╤А╤Л╤В╤М';
+    chestResultEl.textContent = 'Сундук заперт — нажми «Открыть»';
+    chestOpenBtn.textContent = 'Открыть';
     chestOpenBtn.disabled = false;
     chestCloseBtn.disabled = false;
     chestOverlayEl.classList.remove('hidden');
@@ -2401,13 +2417,13 @@ function revealChestItem() {
         else unlocks.hats.push(pendingItem.id);
         saveUnlocks();
         wardMarkActive();
-        setWardStatus('╨Э╨╛╨▓╨╛╨╡ ╨▓ ╨│╨░╤А╨┤╨╡╤А╨╛╨▒╨╡: ' + pendingItem.label);
+        setWardStatus('Новое в гардеробе: ' + pendingItem.label);
     }
 
     chestResultEl.textContent = pendingItem
-        ? '╨Я╨╛╨╗╤Г╤З╨╡╨╜╨╛: ' + pendingItem.label
-        : '╨Т╤Б╨╡ ╨╜╨░╨│╤А╨░╨┤╤Л ╤Г╨╢╨╡ ╤Б╨╛╨▒╤А╨░╨╜╤Л!';
-    chestOpenBtn.textContent = '╨Ч╨░╨▒╤А╨░╤В╤М';
+        ? 'Получено: ' + pendingItem.label
+        : 'Все награды уже собраны!';
+    chestOpenBtn.textContent = 'Забрать';
     chestOpenBtn.disabled = false;
     chestCloseBtn.disabled = true;
     updateChestUi();
@@ -2431,7 +2447,7 @@ chestOpenBtn.addEventListener('click', () => {
         chestAnimStart = performance.now();
         chestOpenBtn.disabled = true;
         chestCloseBtn.disabled = true;
-        chestResultEl.textContent = '╨б╤Г╨╜╨┤╤Г╨║ ╨╛╤В╨║╤А╤Л╨▓╨░╨╡╤В╤Б╤ПтАж';
+        chestResultEl.textContent = 'Сундук открывается…';
     } else if (chestState === 'opened') {
         closeChestModal();
     }
