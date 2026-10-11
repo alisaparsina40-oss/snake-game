@@ -80,6 +80,7 @@ let simLoop = null;
 let joinTimer = null;
 let hostGoneTimer = null;
 let resizeTimer = null;
+let helloTimer = null;
 
 /* состояние интерполяции отрисовки */
 let myPrevRender = [];
@@ -1212,6 +1213,11 @@ function onPresence() {
     const count = Object.keys(channel.presenceState()).length;
 
     if (role === 'guest') {
+        if (count >= 2) {
+            clearTimeout(joinTimer);
+            joinTimer = null;
+            if (!stateSeen) mpStatus('Соперник найден! Ожидание старта…');
+        }
         if (count < 2 && stateSeen) {
             if (!hostGoneTimer) {
                 hostGoneTimer = setTimeout(() => {
@@ -1286,7 +1292,13 @@ function connectRoom(code, asHost) {
     channel.on('broadcast', { event: 'state' }, (msg) => { stateSeen = true; onState(msg.payload); });
     channel.on('broadcast', { event: 'dir' }, (msg) => onDir(msg.payload));
     channel.on('broadcast', { event: 'skin' }, (msg) => {
-        if (role === 'host' && msg.payload && typeof msg.payload.hue === 'number') foeHue = msg.payload.hue;
+        if (role !== 'host') return;
+        if (msg.payload && typeof msg.payload.hue === 'number') foeHue = msg.payload.hue;
+        if (!opponentOnline && !roundActive) {
+            opponentOnline = true;
+            mpStatus('Соперник найден!');
+            startRound();
+        }
     });
     channel.on('broadcast', { event: 'again' }, () => {
         if (role === 'host' && over) startRound();
@@ -1305,14 +1317,23 @@ function connectRoom(code, asHost) {
                 mpStatus('Комната ' + code + ' — ждём соперника…');
             } else {
                 mpSend('skin', { hue: playerHue });
+                clearInterval(helloTimer);
+                helloTimer = setInterval(() => {
+                    if (!channel || stateSeen) {
+                        clearInterval(helloTimer);
+                        helloTimer = null;
+                        return;
+                    }
+                    mpSend('skin', { hue: playerHue });
+                }, 1500);
                 mpStatus('Подключение к комнате ' + code + '…');
                 clearTimeout(joinTimer);
                 joinTimer = setTimeout(() => {
                     if (channel && !stateSeen) {
                         leaveRoom();
-                        mpStatus('Комната не найдена');
+                        mpStatus('Комната не найдена: проверьте код и что создатель в игре');
                     }
-                }, 7000);
+                }, 10000);
             }
         } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
             if (subscribeRetries < 5) {
@@ -1334,8 +1355,10 @@ function connectRoom(code, asHost) {
 function leaveRoom(silent) {
     clearTimeout(joinTimer);
     clearTimeout(hostGoneTimer);
+    clearInterval(helloTimer);
     joinTimer = null;
     hostGoneTimer = null;
+    helloTimer = null;
     stopSim();
 
     if (channel) {
