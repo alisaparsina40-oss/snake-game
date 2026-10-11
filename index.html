@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Змейка</title>
+    <title>Змейка — Мультиплеер</title>
     <link rel="icon" href="data:,">
     <link rel="stylesheet" href="style.css">
 </head>
@@ -12,195 +12,68 @@
 <body>
     <div class="game-wrapper">
         <header class="top-bar">
-            <nav class="tabs" id="tabs">
-                <button class="tab active" data-panel="score">Счёт</button>
-                <button class="tab" data-panel="controls">Управление</button>
-                <button class="tab" data-panel="pad">Кнопки</button>
-                <button class="tab" data-panel="leaders">Лидеры</button>
-                <button class="tab" data-panel="mpLeaders">MP лидеры</button>
-                <button class="tab" data-panel="auth">Вход</button>
-                <button class="tab" data-panel="wardrobe">Гардероб</button>
-                <button class="tab" data-panel="mp">Мультиплеер</button>
-            </nav>
+            <div class="room-chip hidden" id="roomChip">
+                Комната: <span id="roomCode">----</span>
+            </div>
 
-            <button id="backBtn" class="hidden" title="К начальному экрану">
-                <span class="back-label">← Назад</span>
-            </button>
-
-            <button id="homeBtn" title="Главное меню">
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                    <path d="M3 10.5L12 3l9 7.5" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"
-                          stroke-linejoin="round" />
-                    <path d="M5 9.5V21h5v-6h4v6h5V9.5" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"
-                          stroke-linejoin="round" />
-                </svg>
-            </button>
-
-            <button id="fullscreenBtn" title="Полный экран (F11)">
-                <svg class="icon-expand" width="20" height="20" viewBox="0 0 24 24" fill="none"
-                     xmlns="http://www.w3.org/2000/svg">
-                    <path d="M3 8V5C3 4.46957 3.21071 3.96086 3.58579 3.58579C3.96086 3.21071 4.46957 3 5 3H8"
-                          stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" />
-                    <path d="M16 3H19C19.5304 3 20.0391 3.21071 20.4142 3.58579C20.7893 3.96086 21 4.46957 21 5V8"
-                          stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" />
-                    <path d="M21 16V19C21 19.5304 20.7893 20.0391 20.4142 20.4142C20.0391 20.7893 19.5304 21 19 21H16"
-                          stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" />
-                    <path d="M8 21H5C4.46957 21 3.96086 20.7893 3.58579 20.4142C3.21071 20.0391 3 19.5304 3 19V16"
-                          stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" />
-                </svg>
-
-                <svg class="icon-compress hidden" width="20" height="20" viewBox="0 0 24 24" fill="none"
-                     xmlns="http://www.w3.org/2000/svg">
-                    <path d="M8 3V5C8 5.53043 7.78929 6.03914 7.41421 6.41421C7.03914 6.78929 6.53043 7 6 7H4"
-                          stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" />
-                    <path d="M20 8H18C17.4696 8 16.9609 7.78929 16.5858 7.41421C16.2107 7.03914 16 6.53043 16 6V4"
-                          stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" />
-                    <path d="M16 20V18C16 17.4696 16.2107 16.9609 16.5858 16.5858C16.9609 16.2107 17.4696 16 18 16H20"
-                          stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" />
-                    <path d="M4 16H6C6.53043 16 7.03914 16.2107 7.41421 16.5858C7.78929 16.9609 8 17.4696 8 18V20"
-                          stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" />
-                </svg>
-            </button>
+            <div class="top-actions">
+                <button id="leaveRoomBtn" class="ghost hidden">Покинуть</button>
+                <button id="fullscreenBtn" title="Полный экран">
+                    <svg class="icon-expand" width="20" height="20" viewBox="0 0 24 24" fill="none"
+                         xmlns="http://www.w3.org/2000/svg">
+                        <path d="M3 8V5C3 4.46957 3.21071 3.96086 3.58579 3.58579C3.96086 3.21071 4.46957 3 5 3H8"
+                              stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" />
+                        <path d="M16 3H19C19.5304 3 20.0391 3.21071 20.4142 3.58579C20.7893 3.96086 21 4.46957 21 5V8"
+                              stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" />
+                        <path d="M21 16V19C21 19.5304 20.7893 20.0391 20.4142 20.4142C20.0391 20.7893 19.5304 21 19 21H16"
+                              stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" />
+                        <path d="M8 21H5C4.46957 21 3.96086 20.7893 3.58579 20.4142C3.21071 20.0391 3 19.5304 3 19V16"
+                              stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" />
+                    </svg>
+                    <svg class="icon-compress hidden" width="20" height="20" viewBox="0 0 24 24" fill="none"
+                         xmlns="http://www.w3.org/2000/svg">
+                        <path d="M8 3V5C8 5.53043 7.78929 6.03914 7.41421 6.41421C7.03914 6.78929 6.53043 7 6 7H4"
+                              stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" />
+                        <path d="M20 8H18C17.4696 8 16.9609 7.78929 16.5858 7.41421C16.2107 7.03914 16 6.53043 16 6V4"
+                              stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" />
+                        <path d="M16 20V18C16 17.4696 16.2107 16.9609 16.5858 16.5858C16.9609 16.2107 17.4696 16 18 16H20"
+                              stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" />
+                        <path d="M4 16H6C6.53043 16 7.03914 16.2107 7.41421 16.5858C7.78929 16.9609 8 17.4696 8 18V20"
+                              stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" />
+                    </svg>
+                </button>
+            </div>
         </header>
-
-        <div class="panels" id="panels">
-            <div class="panel active" id="panel-score">
-                <div class="chip score">Счёт: <span id="score">0</span></div>
-                <div class="chip high-score">Лучший: <span id="highScore">0</span></div>
-                <div class="chip foe hidden" id="foeChip">Соперник: <span id="foeScore">0</span></div>
-                <input id="quickName" type="text" maxlength="16" placeholder="Твоё имя" autocomplete="off">
-            </div>
-
-            <div class="panel" id="panel-controls">
-                <p class="controls-info">Стрелки или WASD — движение • Пробел — пауза • F11 — полный экран</p>
-            </div>
-
-            <div class="panel" id="panel-pad">
-                <div class="mobile-controls">
-                    <button class="dir-btn" data-dir="left">◀</button>
-                    <button class="dir-btn" data-dir="up">▲</button>
-                    <button class="dir-btn" data-dir="down">▼</button>
-                    <button class="dir-btn" data-dir="right">▶</button>
-                </div>
-            </div>
-
-            <div class="panel" id="panel-leaders">
-                <ol id="leadersList" class="leaders-list">
-                    <li class="leaders-empty">Загрузка…</li>
-                </ol>
-            </div>
-
-            <div class="panel" id="panel-mpLeaders">
-                <div class="chips-row mp-leader-switch">
-                    <button class="ward-chip active" data-board="points">По очкам</button>
-                    <button class="ward-chip" data-board="wins">По победам</button>
-                </div>
-                <ol id="mpLeadersList" class="leaders-list">
-                    <li class="leaders-empty">Загрузка…</li>
-                </ol>
-            </div>
-
-            <div class="panel" id="panel-auth">
-                <div class="auth-box" id="authGuest">
-                    <input id="authEmail" type="email" placeholder="e-mail" autocomplete="email">
-                    <input id="authPass" type="password" placeholder="пароль" autocomplete="current-password">
-                    <button id="authLoginBtn">Войти</button>
-                    <button id="authSignupBtn" class="ghost">Создать аккаунт</button>
-                </div>
-
-                <div class="auth-box hidden" id="authUserBox">
-                    <span id="authWho">—</span>
-                    <button id="authLogoutBtn" class="ghost">Выйти</button>
-                </div>
-
-                <p id="authStatus" class="auth-status"></p>
-            </div>
-
-            <div class="panel" id="panel-wardrobe">
-                <div class="wardrobe">
-                    <div class="ward-row">
-                        <span class="ward-label">Имя</span>
-                        <input id="skinName" type="text" maxlength="16" placeholder="Придумай имя"
-                               autocomplete="off">
-                        <button id="skinNameBtn" class="ghost mini">Сохранить</button>
-                    </div>
-
-                    <canvas id="wardPreview" width="460" height="120"></canvas>
-
-                    <div class="ward-row">
-                        <span class="ward-label">Цвет</span>
-                        <div class="swatches" id="hueSwatches"></div>
-                    </div>
-
-                    <div class="ward-row">
-                        <span class="ward-label">Детали</span>
-                        <div class="chips-row" id="patternBtns"></div>
-                    </div>
-
-                    <div class="ward-row">
-                        <span class="ward-label">Шапка</span>
-                        <div class="chips-row" id="hatBtns"></div>
-                    </div>
-
-                    <div class="ward-row">
-                        <span class="ward-label">Награды</span>
-                        <button id="wardChestBtn" class="chest-btn hidden">Открыть сундук</button>
-                        <span id="wardChestHint" class="ward-hint">Сундук падает за 1 место в мультиплеере</span>
-                    </div>
-
-                    <p id="wardStatus" class="auth-status"></p>
-                </div>
-            </div>
-
-            <div class="panel" id="panel-mp">
-                <div class="auth-box">
-                    <input id="roomInput" class="code" type="text" maxlength="4" placeholder="КОД"
-                           autocomplete="off" autocapitalize="characters">
-                    <button id="createRoomBtn">Создать комнату</button>
-                    <button id="joinRoomBtn" class="ghost">Войти по коду</button>
-                    <button id="leaveRoomBtn" class="ghost hidden">Покинуть</button>
-                </div>
-                <p id="roomStatus" class="auth-status">Создай комнату или введи код друга</p>
-            </div>
-        </div>
 
         <div class="stage">
             <canvas id="gameCanvas"></canvas>
 
-            <div id="gameOver" class="overlay hidden">
-                <h1 class="loser" id="resultTitle">LOSER</h1>
-                <p id="soloResult">Твой счёт: <span id="finalScore">0</span></p>
-                <p id="mpResult" class="hidden">Ты: <span id="mpScoreYou">0</span> • Соперник: <span id="mpScoreFoe">0</span></p>
-                <button id="chestBtn" class="chest-btn hidden">Открыть сундук</button>
-                <div class="save-row">
-                    <input id="playerName" type="text" maxlength="16" placeholder="Твоё имя" autocomplete="off">
-                    <button id="saveScoreBtn">В таблицу лидеров</button>
-                </div>
-                <p id="saveStatus" class="save-status"></p>
-                <button id="restartBtn">Играть снова</button>
+            <div class="hud hidden" id="hud">
+                <div class="chip you">Ты: <span id="score">0</span></div>
+                <div class="chip foe">Соперник: <span id="foeScore">0</span></div>
             </div>
 
-            <div id="pause" class="overlay hidden">Пауза</div>
-        </div>
-
-        <div id="chestOverlay" class="chest-overlay hidden">
-            <div class="chest-box">
-                <h2 class="chest-title">Сундук с уроборосом</h2>
-                <canvas id="chestCanvas" width="280" height="250"></canvas>
-                <p id="chestResult" class="chest-result"></p>
-                <div class="chest-actions">
-                    <button id="chestOpenBtn">Открыть</button>
-                    <button id="chestCloseBtn" class="ghost">Закрыть</button>
-                </div>
+            <div id="gameOver" class="overlay hidden">
+                <h1 class="result" id="resultTitle">—</h1>
+                <p class="result-line">Ты: <b id="finalYou">0</b> &nbsp;•&nbsp; Соперник: <b id="finalFoe">0</b></p>
+                <button id="restartBtn">Играть снова</button>
             </div>
         </div>
 
         <div id="startMenu" class="start-menu">
             <div class="start-box">
                 <h1 class="start-title">ЗМЕЙКА</h1>
-                <p class="start-subtitle">Классическая аркадная игра</p>
-                <button id="soloStartBtn" class="start-btn solo">Одиночная игра</button>
-                <button id="mpStartBtn" class="start-btn mp">Мультиплеер</button>
+                <p class="start-subtitle">Только мультиплеер • комната на 2 игрока</p>
+
+                <input id="roomInput" class="code-input" type="text" maxlength="4" placeholder="КОД"
+                       autocomplete="off" autocapitalize="characters">
+
+                <div class="start-actions">
+                    <button id="createRoomBtn" class="start-btn mp">Создать комнату</button>
+                    <button id="joinRoomBtn" class="start-btn ghost">Войти по коду</button>
+                </div>
+
+                <p id="roomStatus" class="room-status">Создай комнату или введи код друга</p>
             </div>
         </div>
     </div>
