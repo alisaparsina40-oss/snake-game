@@ -730,11 +730,16 @@ function drawSnakeInterp(prev, next, vx, vy, alpha, hue, t) {
     for (let i = 0; i < next.length; i++) {
         const p = prev[i], n = next[i];
         let dx = n.x - p.x, dy = n.y - p.y;
-        if (dx > 1) dx -= tileCount;
-        if (dx < -1) dx += tileCount;
-        if (dy > 1) dy -= tileCount;
-        if (dy < -1) dy += tileCount;
-        pos.push({ x: p.x + dx * alpha, y: p.y + dy * alpha });
+        dx -= Math.round(dx / tileCount) * tileCount;
+        dy -= Math.round(dy / tileCount) * tileCount;
+        const cur = { x: p.x + dx * alpha, y: p.y + dy * alpha };
+        if (i > 0) {
+            const ox = pos[i - 1].x - cur.x;
+            const oy = pos[i - 1].y - cur.y;
+            cur.x += Math.round(ox / tileCount) * tileCount;
+            cur.y += Math.round(oy / tileCount) * tileCount;
+        }
+        pos.push(cur);
     }
 
     for (let i = 0; i < pos.length - 1; i++) {
@@ -1288,8 +1293,13 @@ function connectRoom(code, asHost) {
     });
     channel.on('presence', { event: 'sync' }, onPresence);
 
-    channel.subscribe((status) => {
+    let subscribeRetries = 0;
+
+    const onStatus = (status) => {
+        if (!channel) return;
+
         if (status === 'SUBSCRIBED') {
+            subscribeRetries = 0;
             channel.track({ role: role, id: clientId });
             if (role === 'host') {
                 mpStatus('Комната ' + code + ' — ждём соперника…');
@@ -1298,16 +1308,27 @@ function connectRoom(code, asHost) {
                 mpStatus('Подключение к комнате ' + code + '…');
                 clearTimeout(joinTimer);
                 joinTimer = setTimeout(() => {
-                    if (!stateSeen) {
+                    if (channel && !stateSeen) {
                         leaveRoom();
                         mpStatus('Комната не найдена');
                     }
-                }, 5000);
+                }, 7000);
             }
-        } else if (status === 'CHANNEL_ERROR') {
-            mpStatus('Ошибка подключения к Realtime');
+        } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+            if (subscribeRetries < 5) {
+                subscribeRetries++;
+                mpStatus('Плохая связь с Realtime — переподключаемся… (' + subscribeRetries + '/5)');
+                clearTimeout(joinTimer);
+                setTimeout(() => {
+                    if (channel) channel.subscribe(onStatus);
+                }, 1000 * subscribeRetries);
+            } else {
+                mpStatus('Не удалось подключиться. Проверьте интернет и обновите страницу.');
+            }
         }
-    });
+    };
+
+    channel.subscribe(onStatus);
 }
 
 function leaveRoom(silent) {
